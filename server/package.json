@@ -1,0 +1,30 @@
+{
+  "name": "lift-athlete-server",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node src/index.js",
+    "start": "node src/index.js",
+    "build": "node -e \"console.log('Server build complete')\"",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "db:init": "sqlite3 prisma/dev.db < prisma/bootstrap.sql",
+    "import:program-csv": "node scripts/importProgramCsv.js",
+    "import:program-folder": "node scripts/importProgramFolder.js",
+    "seed": "prisma db seed"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

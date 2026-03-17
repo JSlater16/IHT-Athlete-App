@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String
+  email          String          @unique
+  password       String
+  role           String
+  isActive       Boolean         @default(true)
+  athleteProfile AthleteProfile?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model AthleteProfile {
+  id         String      @id @default(cuid())
+  userId     String      @unique
+  phase      String
+  phaseStartedAt DateTime @default(now())
+  coachNotes String      @default("")
+  rehabProfile String    @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
+  programmingDays Int    @default(3)
+  trainingModel   String @default("10-Week")
+  programVariant  String @default("Standard")
+  updatedAt  DateTime    @updatedAt
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifts      Lift[]
+  rehabNotes RehabNote[]
+}
+
+model Lift {
+  id           String         @id @default(cuid())
+  athleteId    String
+  date         DateTime
+  blockLabel   String         @default("")
+  exerciseName String
+  sets         Int
+  reps         Int
+  weight       String
+  notes        String         @default("")
+  completed    Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  athlete      AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, date])
+}
+
+model RehabNote {
+  id        String         @id @default(cuid())
+  athleteId String
+  note      String
+  createdAt DateTime       @default(now())
+  athlete   AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, createdAt])
+}

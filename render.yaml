@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: iht-performance-app
+    env: node
+    plan: starter
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: npm run prisma:push && npm run start
+    disk:
+      name: iht-performance-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        value: file:/var/data/prod.db
+      - key: CLIENT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

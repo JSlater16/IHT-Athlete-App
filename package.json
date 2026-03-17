@@ -1,0 +1,22 @@
+{
+  "name": "lift-athlete-management",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:client": "npm run dev -w client",
+    "dev:server": "npm run dev -w server",
+    "build": "npm run prisma:generate && npm run build -w client && npm run build -w server",
+    "start": "npm run start -w server",
+    "prisma:generate": "npm run prisma:generate -w server",
+    "prisma:push": "npm run prisma:push -w server",
+    "seed": "npm run seed -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
