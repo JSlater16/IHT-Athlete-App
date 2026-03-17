@@ -14,4 +14,9 @@
     "start": "npm run start -w server",
     "prisma:generate": "npm run prisma:generate -w server",
     "prisma:push": "npm run prisma:push -w server",
-    "seed": "npm run seed -w serv
+    "seed": "npm run seed -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
