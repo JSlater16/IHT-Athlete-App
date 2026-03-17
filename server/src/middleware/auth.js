@@ -31,15 +31,4 @@ function requireOwner(req, res, next) {
 }
 
 function requireAthlete(req, res, next) {
-  if (req.user?.role !== "ATHLETE") {
-    return res.status(403).json({ error: "Athlete access required." });
-  }
-  return next();
-}
-
-module.exports = {
-  requireAuth,
-  requireCoach,
-  requireAthlete,
-  requireOwner
-};
+  if (req.user?.

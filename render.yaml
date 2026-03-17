@@ -5,7 +5,7 @@ services:
     plan: starter
     rootDir: .
     buildCommand: npm install --include=dev && npm run build
-    startCommand: npm run prisma:push && npm run start
+    startCommand: npm run prisma:push && npm run bootstrap:owner -w server && npm run start
     disk:
       name: iht-performance-data
       mountPath: /var/data
@@ -23,3 +23,9 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: OWNER_NAME
+        value: Head Coach
+      - key: OWNER_EMAIL
+        value: owner@gym.com
+      - key: OWNER_PASSWORD
+        value: changeme123

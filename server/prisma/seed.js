@@ -157,18 +157,4 @@ async function main() {
         note:
           index === 2
             ? "Quad tendon is responding well. No swelling after the last progression."
-            : "No active rehab note this week. Continue standard soft tissue routine."
-      }
-    });
-  }
-}
-
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (error) => {
-    console.error(error);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+ 

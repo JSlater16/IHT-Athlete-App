@@ -8,6 +8,7 @@
     "build": "node -e \"console.log('Server build complete')\"",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "bootstrap:owner": "node scripts/bootstrapOwner.js",
     "db:init": "sqlite3 prisma/dev.db < prisma/bootstrap.sql",
     "import:program-csv": "node scripts/importProgramCsv.js",
     "import:program-folder": "node scripts/importProgramFolder.js",
@@ -19,12 +20,4 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2"
-  },
-  "devDependencies": {
-    "prisma": "^5.22.0"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  }
-}
+    "jsonwebtoken": "^9

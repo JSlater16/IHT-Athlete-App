@@ -83,6 +83,7 @@ What the deploy does:
 - serves the built frontend from Express in production
 - keeps the SQLite database on a persistent Render disk
 - runs Prisma schema push on startup so the database stays in sync
+- safely ensures the owner account exists on startup without wiping live data
 
 ### Render steps
 
@@ -92,6 +93,21 @@ What the deploy does:
 4. Set `CLIENT_URL` to your public app URL once Render gives you the domain.
    Example: `https://your-app.onrender.com`
 5. After the first deploy finishes, open the live URL and sign in.
+
+### Production owner bootstrap
+
+Render startup now ensures the owner account exists using these env vars:
+
+- `OWNER_NAME`
+- `OWNER_EMAIL`
+- `OWNER_PASSWORD`
+
+Default production owner credentials:
+
+- `owner@gym.com`
+- `changeme123`
+
+You should sign in once deployed and change that password immediately from your own operational process.
 
 ### Production start behavior
 
