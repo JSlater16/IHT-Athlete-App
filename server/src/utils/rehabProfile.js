@@ -69,40 +69,4 @@ function normalizePadPlacementImages(input) {
       }
 
       return {
-        id:
-          typeof image?.id === "string" && image.id.trim().length > 0
-            ? image.id.trim()
-            : `pad-${Date.now()}-${index}`,
-        imageData,
-        side: image?.side === "Right" ? "Right" : "Left",
-        result: image?.result === "Negative" ? "Negative" : "Positive"
-      };
-    })
-    .filter(Boolean);
-}
-
-function normalizeRehabProfile(input) {
-  return {
-    inhibitedMuscles: normalizeInhibitedMuscles(input?.inhibitedMuscles),
-    padPlacementImages: normalizePadPlacementImages(input?.padPlacementImages)
-  };
-}
-
-function parseRehabProfile(rawValue) {
-  if (!rawValue || typeof rawValue !== "string") {
-    return emptyRehabProfile;
-  }
-
-  try {
-    return normalizeRehabProfile(JSON.parse(rawValue));
-  } catch (_error) {
-    return emptyRehabProfile;
-  }
-}
-
-module.exports = {
-  emptyRehabProfile,
-  maxPadPlacementImages,
-  normalizeRehabProfile,
-  parseRehabProfile
-};
+  

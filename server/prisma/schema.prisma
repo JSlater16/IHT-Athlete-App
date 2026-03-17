@@ -56,9 +56,4 @@ model Lift {
 model RehabNote {
   id        String         @id @default(cuid())
   athleteId String
-  note      String
-  createdAt DateTime       @default(now())
-  athlete   AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-
-  @@index([athleteId, createdAt])
-}
+  note      St

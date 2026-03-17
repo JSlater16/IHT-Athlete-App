@@ -33,38 +33,3 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error("CORS origin not allowed."));
-    },
-    credentials: true
-  })
-);
-app.use(express.json());
-
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
-
-app.use("/api/auth", authRoutes);
-app.use("/api/athletes", requireAuth, requireCoach, athleteRoutes);
-app.use("/api/program-library", requireAuth, requireCoach, programLibraryRoutes);
-app.use("/api/staff", requireAuth, requireOwner, staffRoutes);
-app.use("/api/me", requireAuth, requireAthlete, meRoutes);
-
-if (fs.existsSync(clientDistPath)) {
-  app.use(express.static(clientDistPath));
-
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/")) {
-      return next();
-    }
-
-    return res.sendFile(path.join(clientDistPath, "index.html"));
-  });
-}
-
-app.use((error, _req, res, _next) => {
-  console.error(error);
-  res.status(500).json({ error: "Unexpected server error." });
-});
-
-module.exports = app;
