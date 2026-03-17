@@ -30,4 +30,26 @@ export default function CoachLayout() {
           </NavLink>
           {user?.role === "OWNER" ? (
             <NavLink to="/dashboard/staff" className={({ isActive }) => sidebarLinkClass(isActive)}>
- 
+              Staff
+            </NavLink>
+          ) : null}
+        </nav>
+
+        <div className="sidebar-footer">
+          <p className="sidebar-user">{user?.name}</p>
+          <button className="ghost-button" type="button" onClick={logout}>
+            Log out
+          </button>
+        </div>
+      </aside>
+
+      <main className="coach-main">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+function sidebarLinkClass(isActive) {
+  return `sidebar-link ${isActive ? "is-active" : ""}`;
+}

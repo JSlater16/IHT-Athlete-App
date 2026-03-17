@@ -39,4 +39,26 @@ function serializeAthleteProfile(profile) {
 
 function serializeRehabNote(note) {
   return {
-    id: note.i
+    id: note.id,
+    note: note.note,
+    createdAt: note.createdAt
+  };
+}
+
+function serializeStaffUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    isActive: user.isActive,
+    createdAt: user.createdAt
+  };
+}
+
+module.exports = {
+  serializeAthleteProfile,
+  serializeLift,
+  serializeRehabNote,
+  serializeStaffUser
+};
