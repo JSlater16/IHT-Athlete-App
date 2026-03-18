@@ -12,16 +12,4 @@ export default function RequireAuth({ children, role }) {
   const allowedRoles = Array.isArray(role) ? role : role ? [role] : [];
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to={getHomePath(user)} replace />;
-  }
-
-  return children;
-}
-
-function getHomePath(user) {
-  if (user?.role === "COACH" || user?.role === "OWNER") {
-    return "/dashboard";
-  }
-
-  return "/athlete/home";
-}
+    return <Nav

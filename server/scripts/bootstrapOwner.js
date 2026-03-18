@@ -8,28 +8,42 @@ const defaultOwner = {
 };
 
 async function main() {
-  const existingOwner = await prisma.user.findUnique({
+  const hashedPassword = await bcrypt.hash(defaultOwner.password, 10);
+  const ownerByEmail = await prisma.user.findUnique({
     where: { email: defaultOwner.email }
   });
+  const existingOwner = await prisma.user.findFirst({
+    where: { role: "OWNER" },
+    orderBy: { createdAt: "asc" }
+  });
 
-  if (existingOwner) {
-    if (existingOwner.role !== "OWNER" || existingOwner.isActive !== true) {
-      await prisma.user.update({
-        where: { id: existingOwner.id },
-        data: {
-          role: "OWNER",
-          isActive: true
-        }
-      });
-      console.log(`Updated existing owner account: ${defaultOwner.email}`);
-      return;
-    }
-
+  if (ownerByEmail) {
+    await prisma.user.update({
+      where: { id: ownerByEmail.id },
+      data: {
+        name: defaultOwner.name,
+        role: "OWNER",
+        isActive: true
+      }
+    });
     console.log(`Owner account already exists: ${defaultOwner.email}`);
     return;
   }
 
-  const hashedPassword = await bcrypt.hash(defaultOwner.password, 10);
+  if (existingOwner) {
+    await prisma.user.update({
+      where: { id: existingOwner.id },
+      data: {
+        name: defaultOwner.name,
+        email: defaultOwner.email,
+        password: hashedPassword,
+        role: "OWNER",
+        isActive: true
+      }
+    });
+    console.log(`Migrated owner account to: ${defaultOwner.email}`);
+    return;
+  }
 
   await prisma.user.create({
     data: {

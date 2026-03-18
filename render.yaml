@@ -26,6 +26,6 @@ services:
       - key: OWNER_NAME
         value: Head Coach
       - key: OWNER_EMAIL
-        value: owner@gym.com
+        value: david@ihthumanperformance.com
       - key: OWNER_PASSWORD
-        value: changeme123
+        sync: false
