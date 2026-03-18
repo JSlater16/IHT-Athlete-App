@@ -98,4 +98,28 @@ export default function AthleteHistoryPage() {
                           <article key={lift.id} className="history-lift-row">
                             <div>
                               <strong>{lift.exerciseName}</strong>
-                              <p className
+                              <p className="lift-meta">
+                                {lift.sets} x {lift.reps} • {lift.weight}
+                              </p>
+                              <p className="lift-notes">{lift.notes || "No notes."}</p>
+                            </div>
+                            <div className="history-lift-status">
+                              <span className={`status-badge ${lift.completed ? "is-complete" : ""}`}>
+                                {lift.completed ? "Completed" : "Assigned"}
+                              </span>
+                              <span className="history-date">{formatDateTime(lift.date)}</span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}

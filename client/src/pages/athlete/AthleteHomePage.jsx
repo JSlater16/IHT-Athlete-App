@@ -132,4 +132,87 @@ export default function AthleteHomePage() {
             <p className="eyebrow">Selected Training Day</p>
             <h2>{selectedWorkoutDay ? selectedWorkoutDay.label : "No workout day selected"}</h2>
             {selectedWorkoutDay ? (
-              <p className="muted-copy compact-copy">{formatCalendarDate(selectedWork
+              <p className="muted-copy compact-copy">{formatCalendarDate(selectedWorkoutDay.date)}</p>
+            ) : null}
+          </div>
+        </div>
+
+        {loading ? <p className="empty-state">Loading your lifts...</p> : null}
+        {error ? <p className="form-error">{error}</p> : null}
+        {!loading && !error && selectedLifts.length === 0 ? (
+          <p className="empty-state">No lifts assigned for this day.</p>
+        ) : null}
+
+        {selectedBlocks.length > 0 ? (
+          <>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Blocks</p>
+                <h3>Choose a block</h3>
+              </div>
+            </div>
+
+            <div className="tab-switcher block-tabbar">
+              {selectedBlocks.map((block) => (
+                <button
+                  key={block.label}
+                  className={`tab-toggle block-tab ${block.label === selectedBlock?.label ? "is-active" : ""}`}
+                  type="button"
+                  onClick={() => setSelectedBlockLabel(block.label)}
+                >
+                  {block.label}
+                </button>
+              ))}
+            </div>
+
+            {selectedBlock ? (
+              <p className="muted-copy compact-copy block-tab-meta">
+                {selectedBlock.lifts.length} exercises in {selectedBlock.label}
+              </p>
+            ) : null}
+
+            {selectedBlock ? (
+              <section className="lift-block-group">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">Open Block</p>
+                    <h3>{selectedBlock.label}</h3>
+                  </div>
+                </div>
+
+                <div className="lift-card-list">
+                  {selectedBlock.lifts.map((lift) => (
+                    <article
+                      key={lift.id}
+                      className={`lift-card ${lift.completed ? "is-complete" : ""}`}
+                    >
+                      <div className="lift-card-top">
+                        <div>
+                          <h3>{lift.exerciseName}</h3>
+                          <p className="lift-meta">
+                            {lift.sets} x {lift.reps} • {lift.weight}
+                          </p>
+                        </div>
+
+                        <label className="check-chip">
+                          <input
+                            type="checkbox"
+                            checked={lift.completed}
+                            onChange={(event) => toggleComplete(lift.id, event.target.checked)}
+                          />
+                          <span>{lift.completed ? "Done" : "Mark done"}</span>
+                        </label>
+                      </div>
+
+                      <p className="lift-notes">{lift.notes || "No notes from your coach for this lift."}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </>
+        ) : null}
+      </section>
+    </div>
+  );
+}

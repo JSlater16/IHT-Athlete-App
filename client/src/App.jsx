@@ -57,4 +57,32 @@ export default function App() {
       </Route>
 
       <Route
-        pa
+        path="/dashboard"
+        element={
+          <RequireAuth role={["COACH", "OWNER"]}>
+            <CoachLayout />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Navigate to="athletes" replace />} />
+        <Route path="roster" element={<Navigate to="/dashboard/athletes" replace />} />
+        <Route path="athletes" element={<CoachRosterPage />} />
+        <Route path="athletes/:athleteId" element={<CoachAthleteProfilePage />} />
+        <Route path="workouts" element={<CoachWorkoutsPage />} />
+        <Route path="amit" element={<CoachAmitPage />} />
+        <Route
+          path="staff"
+          element={
+            <RequireAuth role="OWNER">
+              <CoachStaffPage />
+            </RequireAuth>
+          }
+        />
+      </Route>
+
+      <Route path="/coach/*" element={<LegacyCoachRedirect />} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
