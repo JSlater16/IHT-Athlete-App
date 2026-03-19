@@ -22,6 +22,37 @@ const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "S
 const allowedModels = new Set(["10-Week", "20-Week"]);
 const allowedFrequencies = new Set([3, 4, 5]);
 
+function getPrepProgramNames(library) {
+  return [...new Set((library?.programs || []).filter((program) => program.phase === "Prep").map((program) => program.name))]
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function resolveAthleteProgramSelection({
+  phase,
+  requestedProgramVariant,
+  fallbackProgramVariant = "",
+  library
+}) {
+  if (phase === "Prep") {
+    const prepProgramNames = getPrepProgramNames(library);
+    const requested = typeof requestedProgramVariant === "string" ? requestedProgramVariant.trim() : "";
+    const fallback = typeof fallbackProgramVariant === "string" ? fallbackProgramVariant.trim() : "";
+
+    if (requested && prepProgramNames.includes(requested)) {
+      return requested;
+    }
+
+    if (fallback && prepProgramNames.includes(fallback)) {
+      return fallback;
+    }
+
+    return prepProgramNames[0] || standardProgramVariant;
+  }
+
+  return resolveProgramVariant(phase, requestedProgramVariant || fallbackProgramVariant);
+}
+
 async function getAthleteProfileOr404(athleteId, res) {
   const athlete = await prisma.athleteProfile.findUnique({
     where: { id: athleteId },
@@ -34,6 +65,14 @@ async function getAthleteProfileOr404(athleteId, res) {
   }
 
   return athlete;
+}
+
+function validatePasswordInput(password) {
+  if (typeof password !== "string" || password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
+
+  return { value: password };
 }
 
 function validateLiftInput(payload) {
@@ -114,14 +153,6 @@ function normalizeAthleteCreatePayload(body) {
     return { error: "Programming days must be 3, 4, or 5." };
   }
 
-  const programVariant = resolveProgramVariant(phase, requestedProgramVariant);
-
-  if (!programVariant) {
-    return {
-      error: `Program type must be ${eccentricProgramVariants.join(" or ")} for Eccentrics.`
-    };
-  }
-
   return {
     value: {
       name,
@@ -129,7 +160,7 @@ function normalizeAthleteCreatePayload(body) {
       password,
       phase,
       trainingModel,
-      programVariant,
+      requestedProgramVariant,
       programmingDays
     }
   };
@@ -140,6 +171,19 @@ router.post("/", async (req, res, next) => {
     const validated = normalizeAthleteCreatePayload(req.body);
     if (validated.error) {
       return res.status(400).json({ error: validated.error });
+    }
+
+    const library = await readProgramLibrary();
+    const programVariant = resolveAthleteProgramSelection({
+      phase: validated.value.phase,
+      requestedProgramVariant: validated.value.requestedProgramVariant,
+      library
+    });
+
+    if (!programVariant) {
+      return res.status(400).json({
+        error: `Program type must be ${eccentricProgramVariants.join(" or ")} for Eccentrics.`
+      });
     }
 
     const hashedPassword = await bcrypt.hash(validated.value.password, 10);
@@ -159,7 +203,7 @@ router.post("/", async (req, res, next) => {
             }),
             programmingDays: validated.value.programmingDays,
             trainingModel: validated.value.trainingModel,
-            programVariant: validated.value.programVariant,
+            programVariant,
             coachNotes: ""
           }
         }
@@ -257,7 +301,13 @@ router.put("/:id", async (req, res, next) => {
       return res.status(400).json({ error: "Programming days must be 3, 4, or 5." });
     }
 
-    const programVariant = resolveProgramVariant(phase, requestedProgramVariant || athlete.programVariant);
+    const library = await readProgramLibrary();
+    const programVariant = resolveAthleteProgramSelection({
+      phase,
+      requestedProgramVariant,
+      fallbackProgramVariant: athlete.programVariant,
+      library
+    });
 
     if (!programVariant) {
       return res.status(400).json({
@@ -296,6 +346,37 @@ router.delete("/:id", async (req, res, next) => {
     });
 
     return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/:id/reset-password", async (req, res, next) => {
+  try {
+    const athlete = await getAthleteProfileOr404(req.params.id, res);
+    if (!athlete) {
+      return;
+    }
+
+    const validatedPassword = validatePasswordInput(req.body?.password);
+    if (validatedPassword.error) {
+      return res.status(400).json({ error: validatedPassword.error });
+    }
+
+    const hashedPassword = await bcrypt.hash(validatedPassword.value, 10);
+    await prisma.user.update({
+      where: { id: athlete.userId },
+      data: { password: hashedPassword }
+    });
+
+    const refreshedAthlete = await getAthleteProfileOr404(athlete.id, res);
+    if (!refreshedAthlete) {
+      return;
+    }
+
+    return res.json({
+      athlete: serializeAthleteProfile(refreshedAthlete)
+    });
   } catch (error) {
     return next(error);
   }
@@ -445,6 +526,41 @@ router.post("/:id/rehab", async (req, res, next) => {
   }
 });
 
+router.put("/:id/rehab/:noteId", async (req, res, next) => {
+  try {
+    const athlete = await getAthleteProfileOr404(req.params.id, res);
+    if (!athlete) {
+      return;
+    }
+
+    if (typeof req.body?.note !== "string" || req.body.note.trim().length < 2) {
+      return res.status(400).json({ error: "Rehab note is required." });
+    }
+
+    const existingNote = await prisma.rehabNote.findFirst({
+      where: {
+        id: req.params.noteId,
+        athleteId: athlete.id
+      }
+    });
+
+    if (!existingNote) {
+      return res.status(404).json({ error: "Rehab note not found." });
+    }
+
+    const updatedNote = await prisma.rehabNote.update({
+      where: { id: existingNote.id },
+      data: {
+        note: req.body.note.trim()
+      }
+    });
+
+    return res.json({ note: serializeRehabNote(updatedNote) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.put("/:id/rehab-profile", async (req, res, next) => {
   try {
     const athlete = await getAthleteProfileOr404(req.params.id, res);
@@ -480,9 +596,14 @@ router.post("/:id/apply-program", async (req, res, next) => {
     const summary = summarizeProgramLibrary(library);
     const matchedProgram = library.programs.find((program) => {
       const programVariant = program.variant || standardProgramVariant;
+      const matchesPrepSelection =
+        athlete.phase === "Prep"
+          ? program.name === athlete.programVariant
+          : programVariant === athlete.programVariant;
+
       return (
         program.phase === athlete.phase &&
-        programVariant === athlete.programVariant &&
+        matchesPrepSelection &&
         Number(program.frequency) === Number(athlete.programmingDays)
       );
     });

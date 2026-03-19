@@ -8,6 +8,14 @@ export default function AthleteProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -26,6 +34,59 @@ export default function AthleteProfilePage() {
 
     loadProfile();
   }, [token]);
+
+  useEffect(() => {
+    if (!passwordSuccess) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setPasswordSuccess(""), 2600);
+    return () => window.clearTimeout(timeout);
+  }, [passwordSuccess]);
+
+  async function handleChangePassword(event) {
+    event.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!passwordForm.currentPassword) {
+      setPasswordError("Current password is required.");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+
+    setPasswordSubmitting(true);
+
+    try {
+      await apiRequest("/api/me/change-password", {
+        method: "PUT",
+        token,
+        body: {
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        }
+      });
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+      setPasswordSuccess("Password updated successfully.");
+    } catch (submitError) {
+      setPasswordError(submitError.message);
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  }
 
   return (
     <div className="page-stack">
@@ -90,6 +151,72 @@ export default function AthleteProfilePage() {
             </div>
             <p className="notes-block">{profile.coachNotes || "No coach notes available yet."}</p>
             <p className="profile-subtle">Last updated {formatDateTime(profile.updatedAt)}</p>
+          </section>
+
+          <section className="ios-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Security</p>
+                <h2>Change password</h2>
+              </div>
+            </div>
+            <p className="muted-copy">Update your password here without needing your coach to reset it.</p>
+
+            <form className="form-grid" onSubmit={handleChangePassword}>
+              <label className="field">
+                <span>Current password</span>
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({
+                      ...current,
+                      currentPassword: event.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>New password</span>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({
+                      ...current,
+                      newPassword: event.target.value
+                    }))
+                  }
+                  minLength={8}
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>Confirm new password</span>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({
+                      ...current,
+                      confirmPassword: event.target.value
+                    }))
+                  }
+                  minLength={8}
+                  required
+                />
+              </label>
+
+              {passwordError ? <p className="form-error">{passwordError}</p> : null}
+              {passwordSuccess ? <p className="form-success">{passwordSuccess}</p> : null}
+
+              <button className="primary-button" type="submit" disabled={passwordSubmitting}>
+                {passwordSubmitting ? "Updating..." : "Save New Password"}
+              </button>
+            </form>
           </section>
         </>
       ) : null}

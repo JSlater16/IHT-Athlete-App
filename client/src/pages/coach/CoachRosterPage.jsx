@@ -28,6 +28,10 @@ export default function CoachRosterPage() {
   const [createForm, setCreateForm] = useState(createEmptyAthleteForm());
   const [createError, setCreateError] = useState("");
   const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [resetAthlete, setResetAthlete] = useState(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   useEffect(() => {
     loadRoster();
@@ -145,6 +149,46 @@ export default function CoachRosterPage() {
     }
   }
 
+  function openResetModal(athlete) {
+    setResetAthlete(athlete);
+    setResetPassword("");
+    setResetError("");
+    setResetSubmitting(false);
+  }
+
+  function closeResetModal() {
+    setResetAthlete(null);
+    setResetPassword("");
+    setResetError("");
+    setResetSubmitting(false);
+  }
+
+  async function handleResetPassword(event) {
+    event.preventDefault();
+    setResetError("");
+
+    if (resetPassword.length < 8) {
+      setResetError("Temporary password must be at least 8 characters.");
+      return;
+    }
+
+    setResetSubmitting(true);
+
+    try {
+      await apiRequest(`/api/athletes/${resetAthlete.id}/reset-password`, {
+        method: "PUT",
+        token,
+        body: { password: resetPassword }
+      });
+      closeResetModal();
+      setToast("Athlete password updated. Share it securely.");
+    } catch (submitError) {
+      setResetError(submitError.message);
+    } finally {
+      setResetSubmitting(false);
+    }
+  }
+
   return (
     <div className="coach-page-stack">
       {toast ? <div className="dashboard-toast is-success">{toast}</div> : null}
@@ -206,6 +250,13 @@ export default function CoachRosterPage() {
                         <Link className="inline-link-button" to={`/dashboard/athletes/${athlete.id}`}>
                           Edit
                         </Link>
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => openResetModal(athlete)}
+                        >
+                          Reset Password
+                        </button>
                         <button
                           className="ghost-button"
                           type="button"
@@ -367,6 +418,50 @@ export default function CoachRosterPage() {
                 </button>
                 <button className="primary-button" type="submit" disabled={createSubmitting}>
                   {createSubmitting ? "Creating..." : "Create Athlete"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {resetAthlete ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeResetModal}>
+          <div className="modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Athlete Access</p>
+                <h2>Reset password</h2>
+              </div>
+              <button className="ghost-button" type="button" onClick={closeResetModal}>
+                Close
+              </button>
+            </div>
+
+            <p className="muted-copy">
+              Set a new temporary password for {resetAthlete.name}. They will use it the next time they sign in.
+            </p>
+
+            <form className="form-grid" onSubmit={handleResetPassword}>
+              <label className="field">
+                <span>Temporary password</span>
+                <input
+                  type="password"
+                  value={resetPassword}
+                  onChange={(event) => setResetPassword(event.target.value)}
+                  minLength={8}
+                  required
+                />
+              </label>
+
+              {resetError ? <p className="form-error">{resetError}</p> : null}
+
+              <div className="modal-actions">
+                <button className="ghost-button" type="button" onClick={closeResetModal}>
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={resetSubmitting}>
+                  {resetSubmitting ? "Updating..." : "Save Password"}
                 </button>
               </div>
             </form>

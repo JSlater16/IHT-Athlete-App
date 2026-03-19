@@ -1,4 +1,5 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
 const { prisma } = require("../utils/prisma");
 const { getWeekRange } = require("../utils/date");
 const { readProgramLibrary } = require("../utils/programLibrary");
@@ -112,6 +113,42 @@ router.put("/lifts/:liftId", async (req, res, next) => {
     });
 
     return res.json({ lift: serializeLift(updated) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/change-password", async (req, res, next) => {
+  try {
+    const athlete = await getMyProfileOr404(req.user.sub, res);
+    if (!athlete) {
+      return;
+    }
+
+    const currentPassword =
+      typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+    const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+
+    if (!currentPassword) {
+      return res.status(400).json({ error: "Current password is required." });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters." });
+    }
+
+    const passwordMatches = await bcrypt.compare(currentPassword, athlete.user.password);
+    if (!passwordMatches) {
+      return res.status(400).json({ error: "Current password is incorrect." });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: athlete.userId },
+      data: { password: hashedPassword }
+    });
+
+    return res.json({ success: true });
   } catch (error) {
     return next(error);
   }

@@ -30,6 +30,19 @@ const eccentricProgramVariants = ["Alactic Eccentrics", "Lactic Eccentrics"];
 const orderedTrainingPhases = ["Prep", "Eccentrics", "Iso", "Power", "Speed"];
 const maxMuscleSuggestions = 8;
 const maxPadPlacementImages = 8;
+const workoutPlacementOptions = ["Prep", "Block 1", "Block 2", "Block 3", "Block 4"];
+
+function createManualLiftForm(selectedDateKey = "") {
+  return {
+    exerciseName: "",
+    selectedDates: selectedDateKey ? [selectedDateKey] : [],
+    sets: "3",
+    reps: "5",
+    weight: "Bodyweight",
+    blockLabel: "Block 1",
+    notes: ""
+  };
+}
 
 function createInhibitedMuscle() {
   return {
@@ -105,6 +118,28 @@ function getMuscleSuggestions(query) {
   return [...startsWithMatches, ...includesMatches].slice(0, maxMuscleSuggestions);
 }
 
+function getPainSeverity(painScale) {
+  const painValue = Number(painScale);
+
+  if (!Number.isFinite(painValue)) {
+    return "";
+  }
+
+  if (painValue === 10) {
+    return "is-flagged";
+  }
+
+  if (painValue >= 8) {
+    return "is-critical";
+  }
+
+  if (painValue >= 5) {
+    return "is-moderate";
+  }
+
+  return "";
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -138,23 +173,44 @@ export default function CoachAthleteProfilePage() {
   const [weekStart, setWeekStart] = useState(startOfWeek());
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [weeklyLifts, setWeeklyLifts] = useState([]);
+  const [manualLiftForm, setManualLiftForm] = useState(createManualLiftForm());
   const [newRehabNote, setNewRehabNote] = useState("");
   const [rehabProfileForm, setRehabProfileForm] = useState({
     inhibitedMuscles: [],
     padPlacementImages: []
   });
+  const [editingRehabNoteId, setEditingRehabNoteId] = useState("");
+  const [editingRehabNoteText, setEditingRehabNoteText] = useState("");
+  const [editingRehabSubmitting, setEditingRehabSubmitting] = useState(false);
   const [activeMuscleFieldId, setActiveMuscleFieldId] = useState("");
+  const [activeMuscleSuggestionIndex, setActiveMuscleSuggestionIndex] = useState(-1);
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const statusTimerRef = useRef(null);
+  const muscleSuggestionRefs = useRef({});
 
   const weekDays = useMemo(() => buildWeekDays(weekStart), [weekStart]);
   const liftsByDate = useMemo(() => groupLiftsByDate(weeklyLifts), [weeklyLifts]);
   const selectedDateKey = toDateInputValue(selectedDay);
   const selectedDayLifts = liftsByDate[selectedDateKey] || [];
   const modelOptions = fallbackModelOptions;
-  const variantOptions = overviewForm.phase === "Eccentrics" ? eccentricProgramVariants : [standardProgramVariant];
+  const prepProgramOptions = useMemo(() => {
+    return [...new Set((library?.programs || []).filter((program) => program.phase === "Prep").map((program) => program.name))]
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right));
+  }, [library]);
+  const variantOptions = useMemo(() => {
+    if (overviewForm.phase === "Prep") {
+      return prepProgramOptions.length > 0 ? prepProgramOptions : [standardProgramVariant];
+    }
+
+    if (overviewForm.phase === "Eccentrics") {
+      return eccentricProgramVariants;
+    }
+
+    return [standardProgramVariant];
+  }, [overviewForm.phase, prepProgramOptions]);
   const frequencyOptions = useMemo(() => {
     const options = librarySummary.frequencies.length > 0 ? librarySummary.frequencies : [3, 4, 5];
     return overviewForm.programmingDays && !options.includes(Number(overviewForm.programmingDays))
@@ -168,9 +224,14 @@ export default function CoachAthleteProfilePage() {
 
     return (
       library.programs.find((program) => {
+        const variantMatches =
+          overviewForm.phase === "Prep"
+            ? program.name === overviewForm.programVariant
+            : (program.variant || standardProgramVariant) === overviewForm.programVariant;
+
         return (
           program.phase === overviewForm.phase &&
-          (program.variant || standardProgramVariant) === overviewForm.programVariant &&
+          variantMatches &&
           Number(program.frequency) === Number(overviewForm.programmingDays)
         );
       }) || null
@@ -213,6 +274,7 @@ export default function CoachAthleteProfilePage() {
 
   useEffect(() => {
     setSelectedDay(weekStart);
+    setManualLiftForm(createManualLiftForm(toDateInputValue(weekStart)));
   }, [weekStart]);
 
   useEffect(() => {
@@ -381,6 +443,43 @@ export default function CoachAthleteProfilePage() {
     }
   }
 
+  function startEditingRehabNote(note) {
+    setEditingRehabNoteId(note.id);
+    setEditingRehabNoteText(note.note);
+    setError("");
+  }
+
+  function cancelEditingRehabNote() {
+    setEditingRehabNoteId("");
+    setEditingRehabNoteText("");
+    setEditingRehabSubmitting(false);
+  }
+
+  async function handleSaveEditedRehabNote(noteId) {
+    setError("");
+
+    if (editingRehabNoteText.trim().length < 2) {
+      setError("Rehab note is required.");
+      return;
+    }
+
+    setEditingRehabSubmitting(true);
+
+    try {
+      await apiRequest(`/api/athletes/${athleteId}/rehab/${noteId}`, {
+        method: "PUT",
+        token,
+        body: { note: editingRehabNoteText.trim() }
+      });
+      await refreshRehabNotes();
+      cancelEditingRehabNote();
+      showStatus("Rehab note updated.");
+    } catch (saveError) {
+      setError(saveError.message);
+      setEditingRehabSubmitting(false);
+    }
+  }
+
   async function handleRehabProfileSave(event) {
     event.preventDefault();
     setError("");
@@ -481,6 +580,63 @@ export default function CoachAthleteProfilePage() {
       inhibitedMuscles: (current.inhibitedMuscles || []).filter((muscle) => muscle.id !== muscleId)
     }));
     setActiveMuscleFieldId((current) => (current === muscleId ? "" : current));
+    setActiveMuscleSuggestionIndex(-1);
+  }
+
+  function getMuscleSuggestionRefKey(muscleId, suggestionIndex) {
+    return `${muscleId}:${suggestionIndex}`;
+  }
+
+  function scrollActiveMuscleSuggestion(muscleId, suggestionIndex) {
+    window.requestAnimationFrame(() => {
+      const suggestionNode =
+        muscleSuggestionRefs.current[getMuscleSuggestionRefKey(muscleId, suggestionIndex)];
+
+      if (suggestionNode) {
+        suggestionNode.scrollIntoView({
+          block: "nearest"
+        });
+      }
+    });
+  }
+
+  function handleMuscleInputKeyDown(event, muscleId, suggestions) {
+    if (suggestions.length === 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveMuscleSuggestionIndex((current) => {
+        const nextIndex = (current + 1) % suggestions.length;
+        scrollActiveMuscleSuggestion(muscleId, nextIndex);
+        return nextIndex;
+      });
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveMuscleSuggestionIndex((current) => {
+        const nextIndex = current <= 0 ? suggestions.length - 1 : current - 1;
+        scrollActiveMuscleSuggestion(muscleId, nextIndex);
+        return nextIndex;
+      });
+      return;
+    }
+
+    if (event.key === "Enter" && activeMuscleSuggestionIndex >= 0) {
+      event.preventDefault();
+      updateInhibitedMuscle(muscleId, "name", suggestions[activeMuscleSuggestionIndex]);
+      setActiveMuscleFieldId("");
+      setActiveMuscleSuggestionIndex(-1);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      setActiveMuscleFieldId("");
+      setActiveMuscleSuggestionIndex(-1);
+    }
   }
 
   function updatePadPlacementImage(imageId, field, value) {
@@ -503,6 +659,79 @@ export default function CoachAthleteProfilePage() {
     setWeeklyLifts((current) =>
       current.map((lift) => (lift.id === liftId ? { ...lift, [field]: value } : lift))
     );
+  }
+
+  function toggleManualLiftDate(dateKey) {
+    setManualLiftForm((current) => {
+      const alreadySelected = current.selectedDates.includes(dateKey);
+
+      return {
+        ...current,
+        selectedDates: alreadySelected
+          ? current.selectedDates.filter((value) => value !== dateKey)
+          : [...current.selectedDates, dateKey]
+      };
+    });
+  }
+
+  async function handleCreateManualLifts(event) {
+    event.preventDefault();
+    setError("");
+
+    if (!manualLiftForm.exerciseName.trim()) {
+      setError("Exercise name is required.");
+      return;
+    }
+
+    if (manualLiftForm.selectedDates.length === 0) {
+      setError("Select at least one training day.");
+      return;
+    }
+
+    if (!Number.isFinite(Number(manualLiftForm.sets)) || Number(manualLiftForm.sets) < 1) {
+      setError("Sets must be at least 1.");
+      return;
+    }
+
+    if (!Number.isFinite(Number(manualLiftForm.reps)) || Number(manualLiftForm.reps) < 1) {
+      setError("Reps must be at least 1.");
+      return;
+    }
+
+    if (!manualLiftForm.weight.trim()) {
+      setError("Weight is required.");
+      return;
+    }
+
+    try {
+      await Promise.all(
+        manualLiftForm.selectedDates.map((date) =>
+          apiRequest(`/api/athletes/${athleteId}/lifts`, {
+            method: "POST",
+            token,
+            body: {
+              date,
+              blockLabel: manualLiftForm.blockLabel,
+              exerciseName: manualLiftForm.exerciseName.trim(),
+              sets: Number(manualLiftForm.sets),
+              reps: Number(manualLiftForm.reps),
+              weight: manualLiftForm.weight.trim(),
+              notes: manualLiftForm.notes.trim()
+            }
+          })
+        )
+      );
+
+      await refreshWeeklyLifts();
+      setManualLiftForm(createManualLiftForm(toDateInputValue(selectedDay)));
+      showStatus(
+        manualLiftForm.selectedDates.length === 1
+          ? "Workout added."
+          : `Workout added to ${manualLiftForm.selectedDates.length} days.`
+      );
+    } catch (createError) {
+      setError(createError.message);
+    }
   }
 
   return (
@@ -544,7 +773,7 @@ export default function CoachAthleteProfilePage() {
           {activeTab === "overview" ? (
             <section className="dashboard-card">
               <form className="form-grid" onSubmit={handleOverviewSave}>
-                <div className="inline-fields four-up">
+                <div className={`inline-fields ${overviewForm.phase === "Prep" ? "three-up" : "four-up"}`}>
                   <label className="field">
                     <span>Training phase</span>
                     <select
@@ -554,7 +783,9 @@ export default function CoachAthleteProfilePage() {
                           ...current,
                           phase: event.target.value,
                           programVariant:
-                            event.target.value === "Eccentrics"
+                            event.target.value === "Prep"
+                              ? prepProgramOptions[0] || standardProgramVariant
+                              : event.target.value === "Eccentrics"
                               ? eccentricProgramVariants.includes(current.programVariant)
                                 ? current.programVariant
                                 : eccentricProgramVariants[0]
@@ -571,25 +802,27 @@ export default function CoachAthleteProfilePage() {
                     </select>
                   </label>
 
-                  <label className="field">
-                    <span>Training model</span>
-                    <select
-                      value={overviewForm.trainingModel}
-                      onChange={(event) =>
-                        setOverviewForm((current) => ({
-                          ...current,
-                          trainingModel: event.target.value
-                        }))
-                      }
-                      required
-                    >
-                      {modelOptions.map((model) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {overviewForm.phase !== "Prep" ? (
+                    <label className="field">
+                      <span>Training model</span>
+                      <select
+                        value={overviewForm.trainingModel}
+                        onChange={(event) =>
+                          setOverviewForm((current) => ({
+                            ...current,
+                            trainingModel: event.target.value
+                          }))
+                        }
+                        required
+                      >
+                        {modelOptions.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
 
                   <label className="field">
                     <span>Program type</span>
@@ -601,7 +834,6 @@ export default function CoachAthleteProfilePage() {
                           programVariant: event.target.value
                         }))
                       }
-                      disabled={overviewForm.phase !== "Eccentrics"}
                       required
                     >
                       {variantOptions.map((variant) => (
@@ -633,13 +865,15 @@ export default function CoachAthleteProfilePage() {
                   </label>
                 </div>
 
-                <p className="muted-copy compact-copy">
-                  Training model controls phase duration only: 10-Week = 2 weeks per phase, 20-Week = 4 weeks per
-                  phase.
-                </p>
+                {overviewForm.phase !== "Prep" ? (
+                  <p className="muted-copy compact-copy">
+                    Training model controls phase duration only: 10-Week = 2 weeks per phase, 20-Week = 4 weeks per
+                    phase.
+                  </p>
+                ) : null}
                 <p className="muted-copy compact-copy">
                   Program type stays `Standard` for every phase except `Eccentrics`, where you can choose `Alactic
-                  Eccentrics` or `Lactic Eccentrics`.
+                  Eccentrics` or `Lactic Eccentrics`. In `Prep`, it now maps to the specific Prep program you want.
                 </p>
 
                 <label className="field">
@@ -663,7 +897,9 @@ export default function CoachAthleteProfilePage() {
                 {overviewPhaseTimeline?.isStandardPhase ? (
                   <>
                     <div className="program-summary-grid">
-                      <span className="metric-chip">{overviewForm.trainingModel}</span>
+                      {overviewForm.phase !== "Prep" ? (
+                        <span className="metric-chip">{overviewForm.trainingModel}</span>
+                      ) : null}
                       <span className="metric-chip">{overviewPhaseTimeline.weeksPerPhase} weeks per phase</span>
                       <span className="metric-chip">
                         Started {formatCalendarDate(overviewPhaseTimeline.phaseStartedAt)}
@@ -767,6 +1003,20 @@ export default function CoachAthleteProfilePage() {
                             />
                           </label>
 
+                          <label className="field">
+                            <span>Workout block</span>
+                            <select
+                              value={lift.blockLabel || "Block 1"}
+                              onChange={(event) => updateLiftField(lift.id, "blockLabel", event.target.value)}
+                            >
+                              {workoutPlacementOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
                           <label className="field field-full">
                             <span>Notes</span>
                             <textarea
@@ -799,6 +1049,146 @@ export default function CoachAthleteProfilePage() {
                 <section className="dashboard-card">
                   <div className="section-heading">
                     <div>
+                      <p className="eyebrow">Manual Programming</p>
+                      <h2>Add specific workouts</h2>
+                    </div>
+                  </div>
+
+                  <p className="muted-copy">
+                    Add a lift to one or more days in this week and choose where it should land in the workout.
+                  </p>
+
+                  <form className="form-grid" onSubmit={handleCreateManualLifts}>
+                    <label className="field">
+                      <span>Exercise</span>
+                      <input
+                        type="text"
+                        value={manualLiftForm.exerciseName}
+                        onChange={(event) =>
+                          setManualLiftForm((current) => ({
+                            ...current,
+                            exerciseName: event.target.value
+                          }))
+                        }
+                        placeholder="Trap bar deadlift"
+                        required
+                      />
+                    </label>
+
+                    <div className="inline-fields three-up">
+                      <label className="field">
+                        <span>Sets</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={manualLiftForm.sets}
+                          onChange={(event) =>
+                            setManualLiftForm((current) => ({
+                              ...current,
+                              sets: event.target.value
+                            }))
+                          }
+                          required
+                        />
+                      </label>
+
+                      <label className="field">
+                        <span>Reps</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={manualLiftForm.reps}
+                          onChange={(event) =>
+                            setManualLiftForm((current) => ({
+                              ...current,
+                              reps: event.target.value
+                            }))
+                          }
+                          required
+                        />
+                      </label>
+
+                      <label className="field">
+                        <span>Weight</span>
+                        <input
+                          type="text"
+                          value={manualLiftForm.weight}
+                          onChange={(event) =>
+                            setManualLiftForm((current) => ({
+                              ...current,
+                              weight: event.target.value
+                            }))
+                          }
+                          required
+                        />
+                      </label>
+                    </div>
+
+                    <label className="field">
+                      <span>Where in workout</span>
+                      <select
+                        value={manualLiftForm.blockLabel}
+                        onChange={(event) =>
+                          setManualLiftForm((current) => ({
+                            ...current,
+                            blockLabel: event.target.value
+                          }))
+                        }
+                      >
+                        {workoutPlacementOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="field">
+                      <span>Days this week</span>
+                      <div className="manual-day-grid">
+                        {weekDays.map((day) => {
+                          const dateKey = toDateInputValue(day);
+                          const isSelected = manualLiftForm.selectedDates.includes(dateKey);
+
+                          return (
+                            <label key={dateKey} className={`manual-day-pill ${isSelected ? "is-selected" : ""}`}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleManualLiftDate(dateKey)}
+                              />
+                              <span>{formatDayShort(day)}</span>
+                              <strong>{formatMonthDay(day)}</strong>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <label className="field">
+                      <span>Notes</span>
+                      <textarea
+                        rows="3"
+                        value={manualLiftForm.notes}
+                        onChange={(event) =>
+                          setManualLiftForm((current) => ({
+                            ...current,
+                            notes: event.target.value
+                          }))
+                        }
+                        placeholder="Optional coaching notes"
+                      />
+                    </label>
+
+                    <button className="primary-button desktop-button" type="submit">
+                      Add to weekly program
+                    </button>
+                  </form>
+                </section>
+
+                <section className="dashboard-card">
+                  <div className="section-heading">
+                    <div>
                       <p className="eyebrow">Template Engine</p>
                       <h2>Auto-program this week</h2>
                     </div>
@@ -806,7 +1196,9 @@ export default function CoachAthleteProfilePage() {
 
                   <div className="program-summary-grid">
                     <span className="metric-chip">Phase: {overviewForm.phase}</span>
-                    <span className="metric-chip">Model: {overviewForm.trainingModel}</span>
+                    {overviewForm.phase !== "Prep" ? (
+                      <span className="metric-chip">Model: {overviewForm.trainingModel}</span>
+                    ) : null}
                     <span className="metric-chip">Program Type: {overviewForm.programVariant}</span>
                     <span className="metric-chip">
                       Frequency: {overviewForm.programmingDays}x / week
@@ -911,6 +1303,7 @@ export default function CoachAthleteProfilePage() {
                       (rehabProfileForm.inhibitedMuscles || []).map((muscle) => {
                         const suggestions =
                           activeMuscleFieldId === muscle.id ? getMuscleSuggestions(muscle.name) : [];
+                        const painSeverityClass = muscle.pain ? getPainSeverity(muscle.painScale) : "";
 
                         return (
                         <article
@@ -928,30 +1321,47 @@ export default function CoachAthleteProfilePage() {
                                 type="text"
                                 value={muscle.name}
                                 autoComplete="off"
-                                onFocus={() => setActiveMuscleFieldId(muscle.id)}
+                                onFocus={() => {
+                                  setActiveMuscleFieldId(muscle.id);
+                                  setActiveMuscleSuggestionIndex(-1);
+                                }}
                                 onBlur={() => {
                                   window.setTimeout(() => {
-                                    setActiveMuscleFieldId((current) =>
-                                      current === muscle.id ? "" : current
-                                    );
+                                    setActiveMuscleFieldId((current) => (current === muscle.id ? "" : current));
+                                    setActiveMuscleSuggestionIndex(-1);
                                   }, 120);
                                 }}
                                 onChange={(event) =>
                                   updateInhibitedMuscle(muscle.id, "name", event.target.value)
                                 }
+                                onKeyDown={(event) =>
+                                  handleMuscleInputKeyDown(event, muscle.id, suggestions)
+                                }
                                 placeholder="Adductor Longus"
                               />
                               {suggestions.length > 0 ? (
                                 <div className="rehab-muscle-autocomplete" role="listbox">
-                                  {suggestions.map((muscleName) => (
+                                  {suggestions.map((muscleName, suggestionIndex) => (
                                     <button
                                       key={muscleName}
-                                      className="rehab-muscle-option"
+                                      ref={(node) => {
+                                        const refKey = getMuscleSuggestionRefKey(muscle.id, suggestionIndex);
+
+                                        if (node) {
+                                          muscleSuggestionRefs.current[refKey] = node;
+                                        } else {
+                                          delete muscleSuggestionRefs.current[refKey];
+                                        }
+                                      }}
+                                      className={`rehab-muscle-option ${
+                                        suggestionIndex === activeMuscleSuggestionIndex ? "is-active" : ""
+                                      }`}
                                       type="button"
                                       onMouseDown={(event) => {
                                         event.preventDefault();
                                         updateInhibitedMuscle(muscle.id, "name", muscleName);
                                         setActiveMuscleFieldId("");
+                                        setActiveMuscleSuggestionIndex(-1);
                                       }}
                                     >
                                       {muscleName}
@@ -972,6 +1382,7 @@ export default function CoachAthleteProfilePage() {
                                   }
                                 />
                                 <input
+                                  className={`rehab-pain-input ${painSeverityClass}`.trim()}
                                   type="number"
                                   min="0"
                                   max="10"
@@ -982,6 +1393,9 @@ export default function CoachAthleteProfilePage() {
                                   disabled={!muscle.pain}
                                   placeholder="0-10"
                                 />
+                                {painSeverityClass === "is-flagged" ? (
+                                  <span className="rehab-flag-icon" aria-label="Flagged" title="Flagged" />
+                                ) : null}
                               </div>
                             </div>
 
@@ -1033,6 +1447,12 @@ export default function CoachAthleteProfilePage() {
                         );
                       })
                     )}
+                  </div>
+
+                  <div className="rehab-add-muscle-row">
+                    <button className="ghost-button" type="button" onClick={addInhibitedMuscle}>
+                      Add inhibited muscle
+                    </button>
                   </div>
 
                   <section className="rehab-media-section">
@@ -1111,9 +1531,6 @@ export default function CoachAthleteProfilePage() {
                   </section>
 
                   <div className="card-actions">
-                    <button className="ghost-button" type="button" onClick={addInhibitedMuscle}>
-                      Add inhibited muscle
-                    </button>
                     <button className="primary-button desktop-button" type="submit">
                       Save rehab profile
                     </button>
@@ -1121,7 +1538,7 @@ export default function CoachAthleteProfilePage() {
                 </form>
               </section>
 
-              <div className="program-side-stack">
+              <div className="program-side-stack rehab-side-stack">
                 <section className="dashboard-card">
                   <div className="section-heading">
                     <div>
@@ -1160,7 +1577,46 @@ export default function CoachAthleteProfilePage() {
                   ) : (
                     rehabNotes.map((note) => (
                       <article key={note.id} className="rehab-note-card">
-                        <p>{note.note}</p>
+                        {editingRehabNoteId === note.id ? (
+                          <>
+                            <textarea
+                              rows="4"
+                              value={editingRehabNoteText}
+                              onChange={(event) => setEditingRehabNoteText(event.target.value)}
+                            />
+                            <div className="rehab-note-actions">
+                              <button
+                                className="ghost-button"
+                                type="button"
+                                onClick={cancelEditingRehabNote}
+                                disabled={editingRehabSubmitting}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="primary-button desktop-button"
+                                type="button"
+                                onClick={() => handleSaveEditedRehabNote(note.id)}
+                                disabled={editingRehabSubmitting}
+                              >
+                                {editingRehabSubmitting ? "Saving..." : "Save"}
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p>{note.note}</p>
+                            <div className="rehab-note-actions">
+                              <button
+                                className="ghost-button"
+                                type="button"
+                                onClick={() => startEditingRehabNote(note)}
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </>
+                        )}
                         <span>{formatDateTime(note.createdAt)}</span>
                       </article>
                     ))
