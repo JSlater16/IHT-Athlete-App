@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { amitMuscles } from "../../data/amitMuscles";
+import { muscleFrequencies } from "../../data/muscleFrequencies";
 import { apiRequest } from "../../lib/api";
 import {
   buildWeekDays,
@@ -48,6 +49,7 @@ function createInhibitedMuscle() {
   return {
     id: `muscle-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name: "",
+    frequency: "",
     pain: false,
     painScale: "",
     primary: false,
@@ -69,6 +71,10 @@ function normalizeRehabProfileForm(profile) {
   return {
     inhibitedMuscles: (profile?.inhibitedMuscles || []).map((muscle) => ({
       ...muscle,
+      frequency:
+        muscle.frequency === null || typeof muscle.frequency === "undefined"
+          ? ""
+          : String(muscle.frequency),
       painScale: muscle.pain ? String(muscle.painScale ?? "") : ""
     })),
     padPlacementImages: (profile?.padPlacementImages || []).slice(0, maxPadPlacementImages).map((image) => ({
@@ -118,6 +124,44 @@ function getMuscleSuggestions(query) {
   return [...startsWithMatches, ...includesMatches].slice(0, maxMuscleSuggestions);
 }
 
+function normalizeMuscleLookupKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\bdivision\b/g, " ")
+    .replace(/\binternal\b/g, " internus ")
+    .replace(/\bexternal\b/g, " externus ")
+    .replace(/\bcoli\b/g, " colli ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function findMuscleFrequencyMatch(name, lookupEntries) {
+  const normalizedName = normalizeMuscleLookupKey(name);
+  if (!normalizedName) {
+    return null;
+  }
+
+  const exactMatch = lookupEntries.find((entry) => entry.key === normalizedName);
+  if (exactMatch) {
+    return exactMatch.frequency;
+  }
+
+  const nameTokens = normalizedName.split(" ").filter(Boolean);
+  if (nameTokens.length === 0) {
+    return null;
+  }
+
+  const tokenMatch = lookupEntries.find((entry) => {
+    return (
+      entry.key.includes(normalizedName) ||
+      normalizedName.includes(entry.key) ||
+      nameTokens.every((token) => entry.tokens.includes(token))
+    );
+  });
+
+  return tokenMatch?.frequency ?? null;
+}
+
 function getPainSeverity(painScale) {
   const painValue = Number(painScale);
 
@@ -138,6 +182,20 @@ function getPainSeverity(painScale) {
   }
 
   return "";
+}
+
+function roundToNearestFive(value) {
+  return Math.round(Number(value) / 5) * 5;
+}
+
+function calculateVoltaFrequency(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  const adjusted = parsed > 502 ? parsed / 2 : parsed;
+  return roundToNearestFive(adjusted);
 }
 
 function readFileAsDataUrl(file) {
@@ -217,6 +275,16 @@ export default function CoachAthleteProfilePage() {
       ? [Number(overviewForm.programmingDays), ...options].sort((left, right) => left - right)
       : options;
   }, [librarySummary.frequencies, overviewForm.programmingDays]);
+  const muscleFrequencyLookup = useMemo(() => {
+    return muscleFrequencies.map((entry) => {
+      const key = normalizeMuscleLookupKey(entry.name);
+      return {
+        ...entry,
+        key,
+        tokens: key.split(" ").filter(Boolean)
+      };
+    });
+  }, []);
   const matchedProgram = useMemo(() => {
     if (!library?.programs) {
       return null;
@@ -556,6 +624,19 @@ export default function CoachAthleteProfilePage() {
       inhibitedMuscles: (current.inhibitedMuscles || []).map((muscle) => {
         if (muscle.id !== muscleId) {
           return muscle;
+        }
+
+        if (field === "name") {
+          const matchedFrequency = findMuscleFrequencyMatch(value, muscleFrequencyLookup);
+
+          return {
+            ...muscle,
+            name: value,
+            frequency:
+              typeof matchedFrequency === "number"
+                ? String(matchedFrequency)
+                : muscle.frequency || ""
+          };
         }
 
         if (field === "pain") {
@@ -1304,6 +1385,7 @@ export default function CoachAthleteProfilePage() {
                         const suggestions =
                           activeMuscleFieldId === muscle.id ? getMuscleSuggestions(muscle.name) : [];
                         const painSeverityClass = muscle.pain ? getPainSeverity(muscle.painScale) : "";
+                        const calculatedFrequency = calculateVoltaFrequency(muscle.frequency);
 
                         return (
                         <article
@@ -1370,6 +1452,13 @@ export default function CoachAthleteProfilePage() {
                                 </div>
                               ) : null}
                             </label>
+
+                            <div className="field rehab-frequency-result">
+                              <span>Frequency</span>
+                              <div className="rehab-frequency-pill">
+                                {calculatedFrequency === null ? "--" : calculatedFrequency}
+                              </div>
+                            </div>
 
                             <div className="field">
                               <span>Pain</span>

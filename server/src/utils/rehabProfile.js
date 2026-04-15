@@ -21,6 +21,19 @@ function normalizePainScale(value, pain) {
   return Math.max(0, Math.min(10, Math.round(parsed)));
 }
 
+function normalizeMuscleFrequency(value) {
+  if (value === "" || value === null || typeof value === "undefined") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return Math.round(parsed);
+}
+
 function normalizeInhibitedMuscles(input) {
   if (!Array.isArray(input)) {
     return [];
@@ -41,6 +54,7 @@ function normalizeInhibitedMuscles(input) {
             ? muscle.id.trim()
             : `muscle-${Date.now()}-${index}`,
         name,
+        frequency: normalizeMuscleFrequency(muscle?.frequency),
         pain,
         painScale: normalizePainScale(muscle?.painScale, pain),
         primary: parseBoolean(muscle?.primary),

@@ -10,14 +10,31 @@ export async function apiRequest(path, { method = "GET", token, body } = {}) {
 
   if (!response.ok) {
     let message = "Something went wrong.";
+    let payload;
 
     try {
-      const payload = await response.json();
+      payload = await response.json();
       if (payload?.error) {
         message = payload.error;
       }
     } catch (_error) {
       message = response.statusText || message;
+    }
+
+    if (
+      response.status === 401 &&
+      typeof window !== "undefined" &&
+      /token|expired|authentication/i.test(message)
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("app:auth-invalid", {
+          detail: {
+            status: response.status,
+            message,
+            path
+          }
+        })
+      );
     }
 
     throw new Error(message);

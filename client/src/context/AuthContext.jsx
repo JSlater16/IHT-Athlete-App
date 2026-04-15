@@ -26,6 +26,15 @@ export function AuthProvider({ children }) {
     }
   }, [session]);
 
+  useEffect(() => {
+    function handleInvalidAuth() {
+      setSession(null);
+    }
+
+    window.addEventListener("app:auth-invalid", handleInvalidAuth);
+    return () => window.removeEventListener("app:auth-invalid", handleInvalidAuth);
+  }, []);
+
   const value = useMemo(
     () => ({
       token: session?.token || "",
