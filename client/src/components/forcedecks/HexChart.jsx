@@ -13,7 +13,7 @@ const RINGS = [0.25, 0.5, 0.75, 1.0];
 // This dramatically amplifies the visible difference between an
 // athlete who's near their PR (e.g. 95%) and one who's regressed
 // (e.g. 75%) — without it, both polygons hug the perimeter.
-const SCALE_FLOOR = 0.6;
+const SCALE_FLOOR = 0.5;
 const SCALE_RANGE = 1 - SCALE_FLOOR;
 
 function rescale(ratio) {
