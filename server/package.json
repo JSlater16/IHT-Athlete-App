@@ -13,6 +13,7 @@
     "prisma:push": "prisma migrate deploy",
     "bootstrap:owner": "node scripts/bootstrapOwner.js",
     "import:sqlite": "node scripts/importFromSqlite.js",
+    "seed:forcedecks": "node scripts/seedForcedecksDemo.js",
     "import:program-csv": "node scripts/importProgramCsv.js",
     "import:program-folder": "node scripts/importProgramFolder.js",
     "seed": "prisma db seed"
