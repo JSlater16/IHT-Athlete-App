@@ -16,6 +16,9 @@ const {
   serializeLift,
   serializeRehabNote
 } = require("../utils/formatters");
+const { recordAudit } = require("../utils/audit");
+const { validatePassword } = require("../utils/password");
+const { passwordChangeLimiter } = require("../utils/rateLimiters");
 
 const router = express.Router();
 const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"]);
@@ -186,7 +189,9 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(validated.value.password, 10);
+    validatePassword(validated.value.password);
+
+    const hashedPassword = await bcrypt.hash(validated.value.password, 12);
     const athlete = await prisma.user.create({
       data: {
         name: validated.value.name,
@@ -217,12 +222,29 @@ router.post("/", async (req, res, next) => {
       }
     });
 
+    await recordAudit({
+      req,
+      action: "athlete.create",
+      targetType: "athlete",
+      targetId: athlete.athleteProfile.id,
+      targetLabel: athlete.email,
+      metadata: {
+        phase: validated.value.phase,
+        trainingModel: validated.value.trainingModel,
+        programmingDays: validated.value.programmingDays
+      }
+    });
+
     return res.status(201).json({
       athlete: serializeAthleteProfile(athlete.athleteProfile)
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return res.status(400).json({ error: "An athlete with that email already exists." });
+    }
+
+    if (error?.status === 400) {
+      return res.status(400).json({ error: error.message });
     }
 
     return next(error);
@@ -328,6 +350,26 @@ router.put("/:id", async (req, res, next) => {
       include: { user: true }
     });
 
+    /* Audit metadata records the *summary* of what changed, not the
+       raw body — bodies can contain free-text coachNotes which we
+       don't want duplicated into audit logs. Just flag which fields
+       moved. */
+    const changedFields = [];
+    if (phase !== athlete.phase) changedFields.push("phase");
+    if (trainingModel !== athlete.trainingModel) changedFields.push("trainingModel");
+    if (programVariant !== athlete.programVariant) changedFields.push("programVariant");
+    if (programmingDays !== athlete.programmingDays) changedFields.push("programmingDays");
+    if (coachNotes !== null && coachNotes !== athlete.coachNotes) changedFields.push("coachNotes");
+
+    await recordAudit({
+      req,
+      action: "athlete.update",
+      targetType: "athlete",
+      targetId: athlete.id,
+      targetLabel: athlete.user.email,
+      metadata: { changedFields }
+    });
+
     return res.json({ athlete: serializeAthleteProfile(updated) });
   } catch (error) {
     return next(error);
@@ -345,28 +387,46 @@ router.delete("/:id", async (req, res, next) => {
       where: { id: athlete.userId }
     });
 
+    await recordAudit({
+      req,
+      action: "athlete.delete",
+      targetType: "athlete",
+      targetId: athlete.id,
+      targetLabel: athlete.user.email,
+      metadata: { name: athlete.user.name, phase: athlete.phase }
+    });
+
     return res.status(204).send();
   } catch (error) {
     return next(error);
   }
 });
 
-router.put("/:id/reset-password", async (req, res, next) => {
+router.put("/:id/reset-password", passwordChangeLimiter, async (req, res, next) => {
   try {
     const athlete = await getAthleteProfileOr404(req.params.id, res);
     if (!athlete) {
       return;
     }
 
-    const validatedPassword = validatePasswordInput(req.body?.password);
-    if (validatedPassword.error) {
-      return res.status(400).json({ error: validatedPassword.error });
-    }
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    validatePassword(password);
 
-    const hashedPassword = await bcrypt.hash(validatedPassword.value, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     await prisma.user.update({
       where: { id: athlete.userId },
-      data: { password: hashedPassword }
+      data: {
+        password: hashedPassword,
+        tokenVersion: { increment: 1 }
+      }
+    });
+
+    await recordAudit({
+      req,
+      action: "athlete.password_reset",
+      targetType: "athlete",
+      targetId: athlete.id,
+      targetLabel: athlete.user.email
     });
 
     const refreshedAthlete = await getAthleteProfileOr404(athlete.id, res);
@@ -378,6 +438,9 @@ router.put("/:id/reset-password", async (req, res, next) => {
       athlete: serializeAthleteProfile(refreshedAthlete)
     });
   } catch (error) {
+    if (error?.status === 400) {
+      return res.status(400).json({ error: error.message });
+    }
     return next(error);
   }
 });
@@ -433,6 +496,15 @@ router.post("/:id/lifts", async (req, res, next) => {
       }
     });
 
+    await recordAudit({
+      req,
+      action: "lift.create",
+      targetType: "lift",
+      targetId: lift.id,
+      targetLabel: lift.exerciseName,
+      metadata: { athleteId: athlete.id, date: lift.date }
+    });
+
     return res.status(201).json({ lift: serializeLift(lift) });
   } catch (error) {
     return next(error);
@@ -471,6 +543,15 @@ router.put("/:id/lifts/:liftId", async (req, res, next) => {
       }
     });
 
+    await recordAudit({
+      req,
+      action: "lift.update",
+      targetType: "lift",
+      targetId: lift.id,
+      targetLabel: lift.exerciseName,
+      metadata: { athleteId: athlete.id }
+    });
+
     return res.json({ lift: serializeLift(lift) });
   } catch (error) {
     return next(error);
@@ -496,6 +577,16 @@ router.delete("/:id/lifts/:liftId", async (req, res, next) => {
     }
 
     await prisma.lift.delete({ where: { id: existingLift.id } });
+
+    await recordAudit({
+      req,
+      action: "lift.delete",
+      targetType: "lift",
+      targetId: existingLift.id,
+      targetLabel: existingLift.exerciseName,
+      metadata: { athleteId: athlete.id }
+    });
+
     return res.json({ success: true });
   } catch (error) {
     return next(error);
@@ -518,6 +609,15 @@ router.post("/:id/rehab", async (req, res, next) => {
         athleteId: athlete.id,
         note: req.body.note.trim()
       }
+    });
+
+    await recordAudit({
+      req,
+      action: "athlete.rehab_note.create",
+      targetType: "rehabNote",
+      targetId: note.id,
+      targetLabel: athlete.user.email,
+      metadata: { athleteId: athlete.id }
     });
 
     return res.status(201).json({ note: serializeRehabNote(note) });
@@ -555,6 +655,15 @@ router.put("/:id/rehab/:noteId", async (req, res, next) => {
       }
     });
 
+    await recordAudit({
+      req,
+      action: "athlete.rehab_note.update",
+      targetType: "rehabNote",
+      targetId: updatedNote.id,
+      targetLabel: athlete.user.email,
+      metadata: { athleteId: athlete.id }
+    });
+
     return res.json({ note: serializeRehabNote(updatedNote) });
   } catch (error) {
     return next(error);
@@ -576,6 +685,17 @@ router.put("/:id/rehab-profile", async (req, res, next) => {
         rehabProfile: JSON.stringify(rehabProfile)
       },
       include: { user: true }
+    });
+
+    /* Audit rehab-profile updates without dumping the body —
+       pad-placement images live here and can be megabytes of
+       base64. Just record that an update happened. */
+    await recordAudit({
+      req,
+      action: "athlete.rehab_profile.update",
+      targetType: "athlete",
+      targetId: athlete.id,
+      targetLabel: athlete.user.email
     });
 
     return res.json({ athlete: serializeAthleteProfile(updated) });
@@ -661,6 +781,22 @@ router.post("/:id/apply-program", async (req, res, next) => {
         }
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }]
+    });
+
+    await recordAudit({
+      req,
+      action: "athlete.apply_program",
+      targetType: "athlete",
+      targetId: athlete.id,
+      targetLabel: athlete.user.email,
+      metadata: {
+        programId: matchedProgram.id,
+        programName: matchedProgram.name,
+        phase: matchedProgram.phase,
+        variant: matchedProgram.variant || standardProgramVariant,
+        frequency: matchedProgram.frequency,
+        weekStart
+      }
     });
 
     return res.json({

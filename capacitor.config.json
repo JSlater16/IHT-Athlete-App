@@ -1,0 +1,5 @@
+{
+  "appId": "com.ihtperformance.app",
+  "appName": "IHT Training",
+  "webDir": "client/dist"
+}

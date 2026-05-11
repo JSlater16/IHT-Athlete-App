@@ -1,5 +1,12 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { HomeIcon, HistoryIcon, ProfileIcon } from "../components/icons";
+
+const tabs = [
+  { to: "/athlete/home", label: "Home", Icon: HomeIcon },
+  { to: "/athlete/history", label: "History", Icon: HistoryIcon },
+  { to: "/athlete/profile", label: "Profile", Icon: ProfileIcon }
+];
 
 export default function AthleteLayout() {
   const { logout, user } = useAuth();
@@ -26,16 +33,13 @@ export default function AthleteLayout() {
           <Outlet />
         </main>
 
-        <nav className="ios-tabbar">
-          <NavLink to="/athlete/home" className={({ isActive }) => tabClass(isActive)}>
-            <span className="tab-icon">Home</span>
-          </NavLink>
-          <NavLink to="/athlete/history" className={({ isActive }) => tabClass(isActive)}>
-            <span className="tab-icon">History</span>
-          </NavLink>
-          <NavLink to="/athlete/profile" className={({ isActive }) => tabClass(isActive)}>
-            <span className="tab-icon">Profile</span>
-          </NavLink>
+        <nav className="ios-tabbar" aria-label="Athlete navigation">
+          {tabs.map(({ to, label, Icon }) => (
+            <NavLink key={to} to={to} className={({ isActive }) => tabClass(isActive)}>
+              <Icon className="tab-icon" />
+              <span className="tab-label">{label}</span>
+            </NavLink>
+          ))}
         </nav>
       </div>
     </div>

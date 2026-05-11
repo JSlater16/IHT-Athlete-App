@@ -8,6 +8,9 @@ const { buildPhaseTimeline } = require("../utils/phasePlan");
 const { standardProgramVariant } = require("../utils/programVariant");
 const { enrichLiftBlocks } = require("../utils/liftBlocks");
 const { parseRehabProfile } = require("../utils/rehabProfile");
+const { validatePassword } = require("../utils/password");
+const { passwordChangeLimiter } = require("../utils/rateLimiters");
+const { recordAudit } = require("../utils/audit");
 
 const router = express.Router();
 
@@ -118,7 +121,7 @@ router.put("/lifts/:liftId", async (req, res, next) => {
   }
 });
 
-router.put("/change-password", async (req, res, next) => {
+router.put("/change-password", passwordChangeLimiter, async (req, res, next) => {
   try {
     const athlete = await getMyProfileOr404(req.user.sub, res);
     if (!athlete) {
@@ -133,23 +136,38 @@ router.put("/change-password", async (req, res, next) => {
       return res.status(400).json({ error: "Current password is required." });
     }
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: "New password must be at least 8 characters." });
-    }
+    validatePassword(newPassword);
 
     const passwordMatches = await bcrypt.compare(currentPassword, athlete.user.password);
     if (!passwordMatches) {
       return res.status(400).json({ error: "Current password is incorrect." });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    /* Bump tokenVersion so every existing JWT for this user becomes
+       invalid the next time requireAuth runs. Forces re-login on
+       any other devices the athlete might be signed into. */
     await prisma.user.update({
       where: { id: athlete.userId },
-      data: { password: hashedPassword }
+      data: {
+        password: hashedPassword,
+        tokenVersion: { increment: 1 }
+      }
+    });
+
+    await recordAudit({
+      req,
+      action: "auth.password_change",
+      targetType: "user",
+      targetId: athlete.userId,
+      targetLabel: athlete.user.email
     });
 
     return res.json({ success: true });
   } catch (error) {
+    if (error?.status === 400) {
+      return res.status(400).json({ error: error.message });
+    }
     return next(error);
   }
 });

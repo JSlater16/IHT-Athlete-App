@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
+import { SkeletonRosterRow } from "../../components/Skeleton";
+import ConfirmModal from "../../components/ConfirmModal";
 import { formatDateTime } from "../../utils/date";
 
 function createEmptyAthleteForm() {
@@ -32,9 +34,12 @@ export default function CoachRosterPage() {
   const [resetPassword, setResetPassword] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
-    loadRoster();
+    const ctrl = new AbortController();
+    loadRoster(ctrl.signal);
+    return () => ctrl.abort();
   }, [token]);
 
   useEffect(() => {
@@ -46,17 +51,22 @@ export default function CoachRosterPage() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  async function loadRoster() {
+  async function loadRoster(signal) {
     setLoading(true);
     setError("");
 
     try {
-      const data = await apiRequest("/api/athletes", { token });
-      setAthletes(data.athletes);
+      const data = await apiRequest("/api/athletes", { token, signal });
+      setAthletes(data?.athletes || []);
     } catch (loadError) {
+      if (loadError.name === "AbortError") {
+        return;
+      }
       setError(loadError.message);
     } finally {
-      setLoading(false);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
   }
 
@@ -129,13 +139,11 @@ export default function CoachRosterPage() {
   }
 
   async function handleDeleteAthlete(athlete) {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete ${athlete.name}? This will remove their profile, lifts, and rehab notes.`
-    );
+    setConfirmDelete(athlete);
+  }
 
-    if (!confirmed) {
-      return;
-    }
+  async function performDeleteAthlete(athlete) {
+    setConfirmDelete(null);
 
     try {
       await apiRequest(`/api/athletes/${athlete.id}`, {
@@ -215,10 +223,9 @@ export default function CoachRosterPage() {
           />
         </div>
 
-        {loading ? <p className="empty-state">Loading roster...</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
 
-        {!loading && !error ? (
+        {loading || !error ? (
           <div className="table-wrap">
             <table className="roster-table">
               <thead>
@@ -230,7 +237,12 @@ export default function CoachRosterPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAthletes.map((athlete) => (
+                {loading
+                  ? Array.from({ length: 4 }).map((_, index) => (
+                      <SkeletonRosterRow key={`skeleton-${index}`} />
+                    ))
+                  : null}
+                {!loading && filteredAthletes.map((athlete) => (
                   <tr key={athlete.id}>
                     <td>
                       <div className="table-name-cell">
@@ -271,7 +283,7 @@ export default function CoachRosterPage() {
               </tbody>
             </table>
 
-            {filteredAthletes.length === 0 ? (
+            {!loading && filteredAthletes.length === 0 ? (
               <p className="empty-state">No athletes match that search.</p>
             ) : null}
           </div>
@@ -424,6 +436,21 @@ export default function CoachRosterPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete athlete?"
+        message={
+          confirmDelete
+            ? `Are you sure you want to delete ${confirmDelete.name}? This will remove their profile, lifts, and rehab notes.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={() => performDeleteAthlete(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
 
       {resetAthlete ? (
         <div className="modal-backdrop" role="presentation" onClick={closeResetModal}>

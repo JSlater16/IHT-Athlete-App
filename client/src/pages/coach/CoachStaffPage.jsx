@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
+import ConfirmModal from "../../components/ConfirmModal";
 import { formatDateTime } from "../../utils/date";
 
 function createEmptyCoachForm() {
@@ -26,9 +27,12 @@ export default function CoachStaffPage() {
   const [resetPassword, setResetPassword] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(null);
 
   useEffect(() => {
-    loadStaff();
+    const ctrl = new AbortController();
+    loadStaff(ctrl.signal);
+    return () => ctrl.abort();
   }, [token]);
 
   useEffect(() => {
@@ -40,17 +44,22 @@ export default function CoachStaffPage() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  async function loadStaff() {
+  async function loadStaff(signal) {
     setLoading(true);
     setError("");
 
     try {
-      const data = await apiRequest("/api/staff", { token });
-      setStaff(data.staff);
+      const data = await apiRequest("/api/staff", { token, signal });
+      setStaff(data?.staff || []);
     } catch (loadError) {
+      if (loadError.name === "AbortError") {
+        return;
+      }
       setError(loadError.message);
     } finally {
-      setLoading(false);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
   }
 
@@ -109,22 +118,32 @@ export default function CoachStaffPage() {
 
   async function handleToggleActive(member) {
     if (member.isActive) {
-      const confirmed = window.confirm(
-        `Are you sure you want to deactivate ${member.name}? They will lose access immediately.`
-      );
-
-      if (!confirmed) {
-        return;
-      }
+      setConfirmDeactivate(member);
+      return;
     }
 
     try {
-      await apiRequest(`/api/staff/${member.id}/${member.isActive ? "deactivate" : "reactivate"}`, {
+      await apiRequest(`/api/staff/${member.id}/reactivate`, {
         method: "PUT",
         token
       });
       await loadStaff();
-      setToast(member.isActive ? "Coach deactivated." : "Coach reactivated.");
+      setToast("Coach reactivated.");
+    } catch (toggleError) {
+      setError(toggleError.message);
+    }
+  }
+
+  async function performDeactivate(member) {
+    setConfirmDeactivate(null);
+
+    try {
+      await apiRequest(`/api/staff/${member.id}/deactivate`, {
+        method: "PUT",
+        token
+      });
+      await loadStaff();
+      setToast("Coach deactivated.");
     } catch (toggleError) {
       setError(toggleError.message);
     }
@@ -323,6 +342,21 @@ export default function CoachStaffPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={!!confirmDeactivate}
+        title="Deactivate coach?"
+        message={
+          confirmDeactivate
+            ? `Are you sure you want to deactivate ${confirmDeactivate.name}? They will lose access immediately.`
+            : ""
+        }
+        confirmLabel="Deactivate"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={() => performDeactivate(confirmDeactivate)}
+        onCancel={() => setConfirmDeactivate(null)}
+      />
 
       {resetCoach ? (
         <div className="modal-backdrop" role="presentation" onClick={closeResetModal}>

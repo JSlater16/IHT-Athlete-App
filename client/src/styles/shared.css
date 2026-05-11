@@ -1,0 +1,568 @@
+/* Shared primitives used across both athlete and coach surfaces:
+   buttons, cards, modals, badges, chips, form layout, tables, tabs. */
+
+/* Buttons --------------------------------------------------------- */
+
+.primary-button,
+.ghost-button,
+.inline-link-button,
+.tab-toggle,
+.date-pill {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.primary-button {
+  border: none;
+  border-radius: 18px;
+  background: var(--accent-gradient);
+  color: var(--accent-ink);
+  font-weight: 700;
+  padding: 0.95rem 1.2rem;
+  box-shadow: var(--shadow-primary);
+  min-height: 44px;
+  will-change: transform;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+}
+
+/* Tactile press — scale + shadow compression simulates physical
+   depression. Only fires on actual press, not on hover. */
+.primary-button:active {
+  transform: scale(0.97);
+  box-shadow:
+    0 1px 2px rgba(18, 75, 83, 0.16),
+    0 6px 14px rgba(108, 218, 231, 0.24);
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.desktop-button {
+  width: fit-content;
+}
+
+.ghost-button,
+.inline-link-button,
+.tab-toggle {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--text-strong);
+  font-weight: 600;
+  padding: 0.8rem 1rem;
+  min-height: 44px;
+}
+
+/* In dark mode, rgba white is the glass tint — keep it, but make it
+   softer so it doesn't overpower. */
+@media (prefers-color-scheme: dark) {
+  .ghost-button,
+  .inline-link-button,
+  .tab-toggle {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.ghost-button:hover,
+.inline-link-button:hover,
+.tab-toggle:hover,
+.date-pill:hover {
+  transform: translateY(-1px);
+}
+
+.ghost-button:active,
+.inline-link-button:active,
+.tab-toggle:active,
+.date-pill:active {
+  transform: scale(0.97);
+}
+
+/* Disable the tactile press under reduced-motion — pressing never
+   produces a scale change, just a color flash. */
+@media (prefers-reduced-motion: reduce) {
+  .primary-button:active,
+  .ghost-button:active,
+  .inline-link-button:active,
+  .tab-toggle:active,
+  .date-pill:active {
+    transform: none;
+  }
+}
+
+/* Surfaces -------------------------------------------------------- */
+
+.glass-panel,
+.ios-card,
+.dashboard-card {
+  background: var(--surface);
+  border: 1px solid var(--line-on-surface);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: var(--shadow-soft);
+}
+
+.ios-card,
+.dashboard-card {
+  border-radius: 28px;
+  padding: 1.15rem;
+}
+
+.hero-card {
+  background: var(--hero-card-background);
+}
+
+/* Form grid / field layout ---------------------------------------- */
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field span {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--field-label);
+}
+
+.inline-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.inline-fields.three-up {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inline-fields.four-up {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.field-full {
+  grid-column: 1 / -1;
+}
+
+.compact-field {
+  min-width: 140px;
+}
+
+/* Section headers / toolbars -------------------------------------- */
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.card-header h2,
+.section-heading h2,
+.coach-page-header h2,
+.athlete-header-card h2,
+.ios-card h2 {
+  margin: 0;
+  letter-spacing: -0.03em;
+}
+
+.section-heading,
+.toolbar,
+.day-program-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Badges + chips -------------------------------------------------- */
+
+.phase-badge,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.status-badge.is-complete {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status-badge.is-inactive {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-soft);
+}
+
+.metric-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  padding: 0.5rem 0.8rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+/* Check chip — must be a 44×44 tap target for iOS / accessibility.
+   The visible chip stays compact but the full label absorbs the tap. */
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: var(--surface-translucent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.7rem 0.95rem;
+  font-size: 0.86rem;
+  min-height: 44px;
+  min-width: 44px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.check-chip input {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin: 0;
+}
+
+.check-chip:focus-within {
+  outline: none;
+  border-color: var(--accent-ring);
+  box-shadow: 0 0 0 4px var(--accent-ring-soft);
+}
+
+/* Avatars --------------------------------------------------------- */
+
+.avatar-placeholder,
+.avatar-large,
+.avatar-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(108, 218, 231, 0.3), rgba(108, 218, 231, 0.1));
+  color: var(--accent-ink);
+  font-weight: 800;
+}
+
+.avatar-placeholder {
+  width: 56px;
+  height: 56px;
+  font-size: 1.25rem;
+}
+
+.avatar-large {
+  width: 72px;
+  height: 72px;
+  font-size: 1.7rem;
+}
+
+.avatar-mini {
+  width: 36px;
+  height: 36px;
+  font-size: 0.9rem;
+}
+
+/* Tab switcher ---------------------------------------------------- */
+
+.tab-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.tab-toggle.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-color: var(--accent-soft-strong);
+}
+
+/* Date pill ------------------------------------------------------- */
+
+.date-pill {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface-translucent);
+  padding: 0.85rem 0.55rem;
+  display: grid;
+  gap: 0.25rem;
+  text-align: center;
+  color: var(--text-soft);
+  min-height: 64px;
+}
+
+.date-pill strong {
+  color: var(--text-strong);
+}
+
+.date-pill.is-active {
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface-translucent));
+  border-color: var(--accent-ring);
+}
+
+/* Modals ---------------------------------------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: var(--backdrop);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-card {
+  width: min(100%, 520px);
+  border-radius: 28px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-on-surface);
+  box-shadow: var(--shadow-modal);
+  padding: 1.25rem;
+}
+
+.modal-card-small {
+  width: min(100%, 420px);
+}
+
+.modal-card-wide {
+  width: min(1080px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* Tables ---------------------------------------------------------- */
+
+.table-wrap {
+  overflow: auto;
+}
+
+.staff-table tr.is-inactive {
+  opacity: 0.58;
+}
+
+.staff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.roster-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.roster-table th,
+.roster-table td {
+  padding: 1rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.roster-table th {
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.table-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.table-name-cell strong {
+  display: block;
+}
+
+/* Toast ----------------------------------------------------------- */
+
+.dashboard-toast {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 30;
+  max-width: 320px;
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+  box-shadow: var(--shadow-toast);
+}
+
+.dashboard-toast.is-success {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-ink);
+}
+
+/* Search input ---------------------------------------------------- */
+
+.search-input {
+  max-width: 360px;
+}
+
+.compact-copy {
+  margin-bottom: 0;
+}
+
+/* Skeleton loaders ------------------------------------------------ */
+
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-muted);
+  border-radius: 10px;
+  isolation: isolate;
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--surface-translucent) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.skeleton-line {
+  height: 0.85rem;
+  width: 100%;
+}
+
+.skeleton-line-lg {
+  height: 1.25rem;
+  width: 100%;
+  border-radius: 12px;
+}
+
+.skeleton-title {
+  height: 1.15rem;
+  width: 100%;
+  border-radius: 12px;
+}
+
+.skeleton-badge {
+  height: 1.9rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.skeleton-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.skeleton-card {
+  height: 110px;
+  border-radius: 24px;
+  width: 100%;
+}
+
+.skeleton-lift-card {
+  /* Re-use lift-card chrome so heights match real content exactly. */
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.skeleton-date-pill {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton::after {
+    animation: none;
+  }
+  .skeleton {
+    opacity: 0.75;
+  }
+}
+
+/* Page stacks (used by both athlete + coach pages) ---------------- */
+
+.page-stack,
+.coach-page-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Shared breakpoints --------------------------------------------- */
+
+@media (max-width: 640px) {
+  .ios-card,
+  .dashboard-card {
+    border-radius: 24px;
+  }
+
+  .inline-fields,
+  .inline-fields.three-up,
+  .inline-fields.four-up {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading,
+  .day-program-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
+import { Skeleton } from "../../components/Skeleton";
 import {
   addDays,
   buildWorkoutDayGroups,
@@ -24,6 +25,8 @@ export default function AthleteHistoryPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const ctrl = new AbortController();
+
     async function loadHistory() {
       setLoading(true);
       setError("");
@@ -33,25 +36,32 @@ export default function AthleteHistoryPage() {
         const responses = await Promise.all(
           historyWeeks.map(async (weekStart) => {
             const data = await apiRequest(`/api/me/lifts?week=${toDateInputValue(weekStart)}`, {
-              token
+              token,
+              signal: ctrl.signal
             });
 
             return {
               weekStart: toDateInputValue(weekStart),
-              lifts: data.lifts
+              lifts: data?.lifts || []
             };
           })
         );
 
         setWeeks(responses);
       } catch (loadError) {
+        if (loadError.name === "AbortError") {
+          return;
+        }
         setError(loadError.message);
       } finally {
-        setLoading(false);
+        if (!ctrl.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadHistory();
+    return () => ctrl.abort();
   }, [token]);
 
   return (
@@ -66,7 +76,16 @@ export default function AthleteHistoryPage() {
         </p>
       </section>
 
-      {loading ? <p className="empty-state">Loading lift history...</p> : null}
+      {loading ? (
+        <div className="history-stack">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="history-week skeleton-history-week">
+              <Skeleton variant="title" width="55%" />
+              <Skeleton variant="line" width="35%" style={{ marginTop: "0.55rem" }} />
+            </div>
+          ))}
+        </div>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
 
       <div className="history-stack">

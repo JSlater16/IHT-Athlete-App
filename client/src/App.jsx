@@ -12,12 +12,13 @@ import CoachAthleteProfilePage from "./pages/coach/CoachAthleteProfilePage";
 import CoachWorkoutsPage from "./pages/coach/CoachWorkoutsPage";
 import CoachAmitPage from "./pages/coach/CoachAmitPage";
 import CoachStaffPage from "./pages/coach/CoachStaffPage";
+import CoachAuditPage from "./pages/coach/CoachAuditPage";
 
 function HomeRedirect() {
   const { user } = useAuth();
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login/coach" replace />;
   }
 
   if (user.role === "COACH") {
@@ -40,7 +41,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={<Navigate to="/login/coach" replace />} />
+      <Route path="/login/coach" element={<LoginPage audience="coach" />} />
+      <Route path="/login/athlete" element={<LoginPage audience="athlete" />} />
 
       <Route
         path="/athlete"
@@ -75,6 +78,14 @@ export default function App() {
           element={
             <RequireAuth role="OWNER">
               <CoachStaffPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="audit"
+          element={
+            <RequireAuth role="OWNER">
+              <CoachAuditPage />
             </RequireAuth>
           }
         />

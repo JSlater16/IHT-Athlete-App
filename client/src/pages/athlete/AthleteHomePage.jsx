@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
+import { SkeletonDatePill, SkeletonLiftCard } from "../../components/Skeleton";
 import {
   buildWorkoutDayGroups,
   formatCalendarDate,
@@ -37,23 +38,32 @@ export default function AthleteHomePage() {
   }, [selectedBlockLabel, selectedBlocks]);
 
   useEffect(() => {
+    const ctrl = new AbortController();
+
     async function loadWeek() {
       setLoading(true);
       setError("");
 
       try {
         const data = await apiRequest(`/api/me/lifts?week=${toDateInputValue(weekStart)}`, {
-          token
+          token,
+          signal: ctrl.signal
         });
-        setLifts(data.lifts);
+        setLifts(data?.lifts || []);
       } catch (loadError) {
+        if (loadError.name === "AbortError") {
+          return;
+        }
         setError(loadError.message);
       } finally {
-        setLoading(false);
+        if (!ctrl.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadWeek();
+    return () => ctrl.abort();
   }, [token, weekStart]);
 
   useEffect(() => {
@@ -78,24 +88,6 @@ export default function AthleteHomePage() {
     }
   }, [selectedBlockLabel, selectedBlocks]);
 
-  async function toggleComplete(liftId, completed) {
-    const previous = lifts;
-    setLifts((current) =>
-      current.map((lift) => (lift.id === liftId ? { ...lift, completed } : lift))
-    );
-
-    try {
-      await apiRequest(`/api/me/lifts/${liftId}`, {
-        method: "PUT",
-        token,
-        body: { completed }
-      });
-    } catch (toggleError) {
-      setLifts(previous);
-      setError(toggleError.message);
-    }
-  }
-
   return (
     <div className="page-stack">
       <section className="ios-card hero-card">
@@ -109,7 +101,13 @@ export default function AthleteHomePage() {
       </section>
 
       <section className="date-strip">
-        {workoutDays.length === 0 ? (
+        {loading && workoutDays.length === 0 ? (
+          <>
+            <SkeletonDatePill />
+            <SkeletonDatePill />
+            <SkeletonDatePill />
+          </>
+        ) : workoutDays.length === 0 ? (
           <p className="empty-state">No training days assigned for this week yet.</p>
         ) : (
           workoutDays.map((day) => (
@@ -137,7 +135,13 @@ export default function AthleteHomePage() {
           </div>
         </div>
 
-        {loading ? <p className="empty-state">Loading your lifts...</p> : null}
+        {loading ? (
+          <div className="lift-card-list">
+            <SkeletonLiftCard />
+            <SkeletonLiftCard />
+            <SkeletonLiftCard />
+          </div>
+        ) : null}
         {error ? <p className="form-error">{error}</p> : null}
         {!loading && !error && selectedLifts.length === 0 ? (
           <p className="empty-state">No lifts assigned for this day.</p>
@@ -193,15 +197,6 @@ export default function AthleteHomePage() {
                             {lift.sets} x {lift.reps} • {lift.weight}
                           </p>
                         </div>
-
-                        <label className="check-chip">
-                          <input
-                            type="checkbox"
-                            checked={lift.completed}
-                            onChange={(event) => toggleComplete(lift.id, event.target.checked)}
-                          />
-                          <span>{lift.completed ? "Done" : "Mark done"}</span>
-                        </label>
                       </div>
 
                       <p className="lift-notes">{lift.notes || "No notes from your coach for this lift."}</p>

@@ -5,3 +5,29 @@ server/prisma/dev.db
 server/prisma/dev.db-journal
 server/.env
 .DS_Store
+
+# environment
+**/.env
+**/.env.*
+!**/.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# editors
+.idea/
+.vscode/
+
+# build caches
+coverage/
+.next/
+*.tsbuildinfo
+
+# stray next.js
+/app/
+
+# iOS
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/

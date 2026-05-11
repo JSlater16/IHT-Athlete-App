@@ -75,7 +75,7 @@ That means coaches and athletes can use the same public URL, and the app will ro
 
 ### Recommended deployment
 
-Use [Render](https://render.com/) with the included [render.yaml](/Users/davidhyde/Documents/Lift%20App/render.yaml#L1).
+Use [Render](https://render.com/) with the included [render.yaml](./render.yaml).
 
 What the deploy does:
 
@@ -94,20 +94,15 @@ What the deploy does:
    Example: `https://your-app.onrender.com`
 5. After the first deploy finishes, open the live URL and sign in.
 
-### Production owner bootstrap
+### First-run setup
 
-Render startup now ensures the owner account exists using these env vars:
+After deploying:
+1. Set `OWNER_EMAIL` and `OWNER_PASSWORD` in your environment (a strong, unique password).
+2. Run `npm run bootstrap:owner -w server` to create the OWNER account.
+3. Log in once and change the password immediately.
+4. To re-key an existing owner, pass `--force`: `npm run bootstrap:owner -w server -- --force`.
 
-- `OWNER_NAME`
-- `OWNER_EMAIL`
-- `OWNER_PASSWORD`
-
-Default production owner credentials:
-
-- `owner@gym.com`
-- `changeme123`
-
-You should sign in once deployed and change that password immediately from your own operational process.
+Athlete accounts are created from the Coach Roster page; no default credentials are shipped.
 
 ### Production start behavior
 
@@ -135,14 +130,6 @@ That gives them a home-screen shortcut without needing the App Store.
 
 - Owner and coach dashboard: `/dashboard`
 - Owner-only staff management: `/dashboard/staff`
-
-## Sample Logins
-
-- Owner: `owner@gym.com` / `changeme123`
-- Coach: `coach@liftlab.com` / `password123`
-- Athlete: `mia@liftlab.com` / `password123`
-- Athlete: `jordan@liftlab.com` / `password123`
-- Athlete: `ava@liftlab.com` / `password123`
 
 ## Coach Creation Script
 

@@ -6,6 +6,7 @@ const {
   writeProgramLibrary
 } = require("../utils/programLibrary");
 const { resolveProgramVariant, standardProgramVariant } = require("../utils/programVariant");
+const { recordAudit } = require("../utils/audit");
 
 const router = express.Router();
 const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"]);
@@ -186,6 +187,21 @@ router.post("/import", async (req, res, next) => {
 
     await writeProgramLibrary(library);
 
+    /* /import is a wholesale replace of the library, so this gets
+       logged as an update rather than create. The metadata records
+       counts only — the full library is huge and lives on disk
+       anyway. */
+    await recordAudit({
+      req,
+      action: "program_library.update",
+      targetType: "program_library",
+      targetLabel: "import",
+      metadata: {
+        liftCount: Array.isArray(library?.liftLibrary) ? library.liftLibrary.length : 0,
+        programCount: Array.isArray(library?.programs) ? library.programs.length : 0
+      }
+    });
+
     return res.status(201).json({
       library,
       summary: summarizeProgramLibrary(library)
@@ -221,6 +237,15 @@ router.post("/lifts", async (req, res, next) => {
     }
 
     await writeProgramLibrary(nextLibrary);
+
+    await recordAudit({
+      req,
+      action: "program_library.create",
+      targetType: "lift_library_entry",
+      targetId: createdLift.id,
+      targetLabel: createdLift.name,
+      metadata: { category: createdLift.category }
+    });
 
     return res.status(201).json({
       lift: createdLift,
@@ -264,6 +289,19 @@ router.post("/programs", async (req, res, next) => {
     }
 
     await writeProgramLibrary(nextLibrary);
+
+    await recordAudit({
+      req,
+      action: "program_library.create",
+      targetType: "program",
+      targetId: createdProgram.id,
+      targetLabel: createdProgram.name,
+      metadata: {
+        phase: createdProgram.phase,
+        variant: createdProgram.variant,
+        frequency: createdProgram.frequency
+      }
+    });
 
     return res.status(201).json({
       program: createdProgram,

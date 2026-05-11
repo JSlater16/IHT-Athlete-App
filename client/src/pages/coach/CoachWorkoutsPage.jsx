@@ -82,7 +82,9 @@ export default function CoachWorkoutsPage() {
   const [programSubmitting, setProgramSubmitting] = useState(false);
 
   useEffect(() => {
-    loadLibrary();
+    const ctrl = new AbortController();
+    loadLibrary(ctrl.signal);
+    return () => ctrl.abort();
   }, [token]);
 
   useEffect(() => {
@@ -94,18 +96,23 @@ export default function CoachWorkoutsPage() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  async function loadLibrary() {
+  async function loadLibrary(signal) {
     setLoading(true);
     setError("");
 
     try {
-      const data = await apiRequest("/api/program-library", { token });
-      setLibrary(data.library);
-      setSummary(data.summary);
+      const data = await apiRequest("/api/program-library", { token, signal });
+      setLibrary(data?.library || null);
+      setSummary(data?.summary || null);
     } catch (loadError) {
+      if (loadError.name === "AbortError") {
+        return;
+      }
       setError(loadError.message);
     } finally {
-      setLoading(false);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
   }
 

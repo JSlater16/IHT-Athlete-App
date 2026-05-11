@@ -8,7 +8,10 @@ const defaultOwner = {
 };
 
 async function main() {
-  const hashedPassword = await bcrypt.hash(defaultOwner.password, 10);
+  /* Cost 12 brings owner bootstrap in line with every other bcrypt
+     call site. The few extra ms only happen at install/migration
+     time. */
+  const hashedPassword = await bcrypt.hash(defaultOwner.password, 12);
   const ownerByEmail = await prisma.user.findUnique({
     where: { email: defaultOwner.email }
   });
@@ -31,6 +34,19 @@ async function main() {
   }
 
   if (existingOwner) {
+    /* Previously this silently rewrote the existing owner's email
+       and password whenever OWNER_EMAIL changed, which made it
+       trivial to lock out the live owner by re-running the script
+       with a typo. Require an explicit --force to confirm intent;
+       otherwise leave the existing record alone and just log. */
+    if (!process.argv.includes("--force")) {
+      console.warn(
+        `[bootstrapOwner] existing OWNER (${existingOwner.email}) does not match OWNER_EMAIL (${defaultOwner.email}). ` +
+          `Refusing to rewrite without --force. Re-run with --force to migrate the owner record.`
+      );
+      return;
+    }
+
     await prisma.user.update({
       where: { id: existingOwner.id },
       data: {

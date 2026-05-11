@@ -1,15 +1,19 @@
+databases:
+  - name: lift-postgres
+    plan: free
+    databaseName: liftapp
+    user: liftapp
+
 services:
   - type: web
     name: iht-performance-app
     env: node
+    nodeVersion: "20"
     plan: starter
     rootDir: .
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm run prisma:push && npm run bootstrap:owner -w server && npm run start
-    disk:
-      name: iht-performance-data
-      mountPath: /var/data
-      sizeGB: 1
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -18,7 +22,9 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: DATABASE_URL
-        value: file:/var/data/prod.db
+        fromDatabase:
+          name: lift-postgres
+          property: connectionString
       - key: CLIENT_URL
         sync: false
       - key: JWT_SECRET

@@ -6,7 +6,7 @@ export default function RequireAuth({ children, role }) {
   const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to={getLoginPath(role)} replace state={{ from: location.pathname }} />;
   }
 
   const allowedRoles = Array.isArray(role) ? role : role ? [role] : [];
@@ -24,4 +24,14 @@ function getHomePath(user) {
   }
 
   return "/athlete/home";
+}
+
+function getLoginPath(role) {
+  const allowedRoles = Array.isArray(role) ? role : role ? [role] : [];
+
+  if (allowedRoles.length === 1 && allowedRoles[0] === "ATHLETE") {
+    return "/login/athlete";
+  }
+
+  return "/login/coach";
 }

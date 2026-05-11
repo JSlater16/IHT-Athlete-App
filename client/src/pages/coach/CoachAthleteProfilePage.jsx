@@ -346,39 +346,50 @@ export default function CoachAthleteProfilePage() {
   }, [weekStart]);
 
   useEffect(() => {
+    const ctrl = new AbortController();
+
     async function loadAthletePage() {
       setLoading(true);
       setError("");
 
       try {
         const [profileData, liftsData, rehabData, libraryData] = await Promise.all([
-          apiRequest(`/api/athletes/${athleteId}`, { token }),
-          apiRequest(`/api/athletes/${athleteId}/lifts?week=${toDateInputValue(weekStart)}`, { token }),
-          apiRequest(`/api/athletes/${athleteId}/rehab`, { token }),
-          apiRequest("/api/program-library", { token })
+          apiRequest(`/api/athletes/${athleteId}`, { token, signal: ctrl.signal }),
+          apiRequest(`/api/athletes/${athleteId}/lifts?week=${toDateInputValue(weekStart)}`, {
+            token,
+            signal: ctrl.signal
+          }),
+          apiRequest(`/api/athletes/${athleteId}/rehab`, { token, signal: ctrl.signal }),
+          apiRequest("/api/program-library", { token, signal: ctrl.signal })
         ]);
 
-        setProfile(profileData.athlete);
+        setProfile(profileData?.athlete || null);
         setOverviewForm({
-          phase: profileData.athlete.phase || "",
-          coachNotes: profileData.athlete.coachNotes || "",
-          programmingDays: profileData.athlete.programmingDays || 3,
-          trainingModel: profileData.athlete.trainingModel || "",
-          programVariant: profileData.athlete.programVariant || standardProgramVariant
+          phase: profileData?.athlete?.phase || "",
+          coachNotes: profileData?.athlete?.coachNotes || "",
+          programmingDays: profileData?.athlete?.programmingDays || 3,
+          trainingModel: profileData?.athlete?.trainingModel || "",
+          programVariant: profileData?.athlete?.programVariant || standardProgramVariant
         });
-        setRehabProfileForm(normalizeRehabProfileForm(profileData.athlete.rehabProfile));
-        setWeeklyLifts(liftsData.lifts);
-        setRehabNotes(rehabData.notes);
-        setLibrary(libraryData.library);
-        setLibrarySummary(libraryData.summary);
+        setRehabProfileForm(normalizeRehabProfileForm(profileData?.athlete?.rehabProfile));
+        setWeeklyLifts(liftsData?.lifts || []);
+        setRehabNotes(rehabData?.notes || []);
+        setLibrary(libraryData?.library || null);
+        setLibrarySummary(libraryData?.summary || null);
       } catch (loadError) {
+        if (loadError.name === "AbortError") {
+          return;
+        }
         setError(loadError.message);
       } finally {
-        setLoading(false);
+        if (!ctrl.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadAthletePage();
+    return () => ctrl.abort();
   }, [athleteId, token, weekStart]);
 
   function showStatus(message) {

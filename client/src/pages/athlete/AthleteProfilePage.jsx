@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
+import { Skeleton } from "../../components/Skeleton";
 import { formatCalendarDate, formatDateTime } from "../../utils/date";
 
 export default function AthleteProfilePage() {
@@ -18,21 +19,29 @@ export default function AthleteProfilePage() {
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   useEffect(() => {
+    const ctrl = new AbortController();
+
     async function loadProfile() {
       setLoading(true);
       setError("");
 
       try {
-        const data = await apiRequest("/api/me/profile", { token });
-        setProfile(data.profile);
+        const data = await apiRequest("/api/me/profile", { token, signal: ctrl.signal });
+        setProfile(data?.profile || null);
       } catch (loadError) {
+        if (loadError.name === "AbortError") {
+          return;
+        }
         setError(loadError.message);
       } finally {
-        setLoading(false);
+        if (!ctrl.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadProfile();
+    return () => ctrl.abort();
   }, [token]);
 
   useEffect(() => {
@@ -98,7 +107,27 @@ export default function AthleteProfilePage() {
         <p className="muted-copy">This section is read-only and reflects what your coach has set.</p>
       </section>
 
-      {loading ? <p className="empty-state">Loading profile...</p> : null}
+      {loading ? (
+        <>
+          <section className="ios-card profile-card">
+            <Skeleton variant="avatar" width="56px" height="56px" />
+            <div style={{ flex: 1 }}>
+              <Skeleton variant="title" width="55%" />
+              <Skeleton variant="line" width="70%" style={{ marginTop: "0.4rem" }} />
+            </div>
+            <Skeleton variant="badge" width="72px" />
+          </section>
+          <section className="ios-card">
+            <Skeleton variant="line" width="30%" />
+            <Skeleton variant="title" width="60%" style={{ marginTop: "0.5rem" }} />
+            <div style={{ display: "flex", gap: "0.6rem", marginTop: "0.9rem" }}>
+              <Skeleton variant="badge" width="120px" />
+              <Skeleton variant="badge" width="90px" />
+              <Skeleton variant="badge" width="110px" />
+            </div>
+          </section>
+        </>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
 
       {profile ? (

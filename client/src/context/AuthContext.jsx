@@ -40,11 +40,21 @@ export function AuthProvider({ children }) {
       token: session?.token || "",
       user: session?.user || null,
       isAuthenticated: Boolean(session?.token),
-      async login(email, password) {
+      async login(email, password, expectedRoles = []) {
         const data = await apiRequest("/api/auth/login", {
           method: "POST",
-          body: { email, password }
+          body: { email, password },
+          skipAuthRedirect: true
         });
+
+        const roles = Array.isArray(expectedRoles) ? expectedRoles : expectedRoles ? [expectedRoles] : [];
+        if (roles.length > 0 && !roles.includes(data.user?.role)) {
+          if (roles.length === 1 && roles[0] === "ATHLETE") {
+            throw new Error("This login is for athletes only.");
+          }
+
+          throw new Error("This login is for coaches only.");
+        }
 
         setSession(data);
         return data;

@@ -3,8 +3,14 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  COACH
+  ATHLETE
 }
 
 model User {
@@ -12,27 +18,30 @@ model User {
   name           String
   email          String          @unique
   password       String
-  role           String
+  role           Role
   isActive       Boolean         @default(true)
+  tokenVersion   Int             @default(0)
   athleteProfile AthleteProfile?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+
+  @@index([role])
 }
 
 model AthleteProfile {
-  id         String      @id @default(cuid())
-  userId     String      @unique
-  phase      String
-  phaseStartedAt DateTime @default(now())
-  coachNotes String      @default("")
-  rehabProfile String    @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
-  programmingDays Int    @default(3)
-  trainingModel   String @default("10-Week")
-  programVariant  String @default("Standard")
-  updatedAt  DateTime    @updatedAt
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lifts      Lift[]
-  rehabNotes RehabNote[]
+  id              String      @id @default(cuid())
+  userId          String      @unique
+  phase           String
+  phaseStartedAt  DateTime    @default(now())
+  coachNotes      String      @default("")
+  rehabProfile    String      @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
+  programmingDays Int         @default(3)
+  trainingModel   String      @default("10-Week")
+  programVariant  String      @default("Standard")
+  updatedAt       DateTime    @updatedAt
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifts           Lift[]
+  rehabNotes      RehabNote[]
 }
 
 model Lift {
@@ -61,4 +70,28 @@ model RehabNote {
   athlete   AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@index([athleteId, createdAt])
+}
+
+// Audit trail for high-trust admin actions (coach lifecycle, athlete
+// deletion, password resets, auth attempts). Actor + target are stored
+// as snapshotted strings rather than foreign keys so the row survives
+// the deletion of the user it references. Metadata is free-form JSON
+// (stored as a string because SQLite has no JSON type).
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actorName   String   @default("")
+  actorRole   Role?
+  action      String
+  targetType  String   @default("")
+  targetId    String?
+  targetLabel String   @default("")
+  ip          String   @default("")
+  metadata    String   @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([targetId])
+  @@index([actorId])
 }
