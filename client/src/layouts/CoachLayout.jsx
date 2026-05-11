@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { AthletesIcon, WorkoutsIcon, AmitIcon, StaffIcon, AuditIcon } from "../components/icons";
+import InstallAppButton from "../components/InstallAppButton";
 
 export default function CoachLayout() {
   const { logout, user } = useAuth();
@@ -48,6 +49,7 @@ export default function CoachLayout() {
 
         <div className="sidebar-footer">
           <p className="sidebar-user">{user?.name}</p>
+          {user?.role === "COACH" || user?.role === "OWNER" ? <InstallAppButton /> : null}
           <button className="ghost-button" type="button" onClick={logout}>
             Log out
           </button>
