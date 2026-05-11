@@ -41,14 +41,16 @@
   align-items: center;
   gap: 0.75rem;
   transition:
-    background 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+    background 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    transform 160ms var(--ease-out);
 }
 
-.sidebar-link:hover {
-  background: var(--surface-translucent);
-  color: var(--text-strong);
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-link:hover {
+    background: var(--surface-translucent);
+    color: var(--text-strong);
+  }
 }
 
 .sidebar-link:active {
@@ -563,15 +565,17 @@
   letter-spacing: -0.01em;
   padding: 0.7rem 1rem;
   transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    background 160ms ease;
+    transform 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    background 160ms var(--ease-out);
 }
 
-.rehab-upload-field input[type="file"]::file-selector-button:hover {
-  background: linear-gradient(135deg, rgba(108, 218, 231, 0.28), rgba(108, 218, 231, 0.42));
-  box-shadow: 0 10px 24px rgba(108, 218, 231, 0.2);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .rehab-upload-field input[type="file"]::file-selector-button:hover {
+    background: linear-gradient(135deg, rgba(108, 218, 231, 0.28), rgba(108, 218, 231, 0.42));
+    box-shadow: 0 10px 24px rgba(108, 218, 231, 0.2);
+    transform: translateY(-1px);
+  }
 }
 
 .rehab-upload-field input[type="file"]::file-selector-button:active {

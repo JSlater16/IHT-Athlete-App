@@ -9,10 +9,11 @@
 .tab-toggle,
 .date-pill {
   transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease;
+    transform 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    background 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
 }
 
 .primary-button {
@@ -27,8 +28,12 @@
   will-change: transform;
 }
 
-.primary-button:hover {
-  transform: translateY(-1px);
+/* Hover lift only on devices that actually hover. On touch devices,
+   :hover sticks after tap which looks broken. */
+@media (hover: hover) and (pointer: fine) {
+  .primary-button:hover {
+    transform: translateY(-1px);
+  }
 }
 
 /* Tactile press — scale + shadow compression simulates physical
@@ -72,11 +77,13 @@
   }
 }
 
-.ghost-button:hover,
-.inline-link-button:hover,
-.tab-toggle:hover,
-.date-pill:hover {
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .ghost-button:hover,
+  .inline-link-button:hover,
+  .tab-toggle:hover,
+  .date-pill:hover {
+    transform: translateY(-1px);
+  }
 }
 
 .ghost-button:active,
@@ -298,6 +305,13 @@
   background: var(--accent-soft);
   color: var(--accent-ink);
   border-color: var(--accent-soft-strong);
+  transform: scale(1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-toggle.is-active {
+    transform: none;
+  }
 }
 
 /* Date pill ------------------------------------------------------- */
@@ -321,6 +335,13 @@
 .date-pill.is-active {
   background: linear-gradient(180deg, var(--accent-soft), var(--surface-translucent));
   border-color: var(--accent-ring);
+  transform: scale(1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .date-pill.is-active {
+    transform: none;
+  }
 }
 
 /* Modals ---------------------------------------------------------- */
@@ -336,6 +357,16 @@
   background: var(--backdrop);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  /* Fade the dim+blur on enter; @starting-style only kicks in on
+     browsers that support it (Chrome 117+, Safari 17.4+, FF 129+).
+     Older browsers skip the rule and the backdrop appears instantly,
+     which is the previous behavior. */
+  opacity: 1;
+  transition: opacity 200ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .modal-card {
@@ -345,6 +376,19 @@
   border: 1px solid var(--line-on-surface);
   box-shadow: var(--shadow-modal);
   padding: 1.25rem;
+  /* Origin: center is correct for modals (centered viewport elements).
+     Popovers are the opposite and should anchor to their trigger. */
+  transform-origin: center;
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 .modal-card-small {
@@ -419,12 +463,51 @@
   border-radius: 18px;
   padding: 0.9rem 1rem;
   box-shadow: var(--shadow-toast);
+  /* Slide in from the same edge the toast lives on (right) so the
+     dismissal direction feels intuitive. Falls back to instant on
+     browsers without @starting-style. */
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity 320ms var(--ease-out),
+    transform 320ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateX(calc(100% + 1.5rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-toast {
+    transition: opacity 200ms ease;
+    transform: none;
+
+    @starting-style {
+      transform: none;
+    }
+  }
 }
 
 .dashboard-toast.is-success {
   background: var(--success-bg);
   border: 1px solid var(--success-border);
   color: var(--success-ink);
+}
+
+/* Install-app button --------------------------------------------- */
+
+.install-app-button {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 240ms var(--ease-out),
+    transform 240ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 /* Search input ---------------------------------------------------- */
@@ -464,7 +547,9 @@
   background: var(--surface-muted);
   border-radius: 10px;
   isolation: isolate;
-  animation: skeleton-pulse 1.8s ease-in-out infinite;
+  /* Faster pulse/shimmer makes loading feel quicker even when the
+     actual fetch time is identical. */
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
 
 .skeleton::after {
@@ -478,7 +563,7 @@
     transparent 100%
   );
   transform: translateX(-100%);
-  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
 }
 
 .skeleton-line {

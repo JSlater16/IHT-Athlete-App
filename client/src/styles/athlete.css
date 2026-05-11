@@ -89,6 +89,24 @@
   padding-bottom: 0.2rem;
 }
 
+/* Light stagger on the date pills so they cascade in on first load. */
+.date-strip > .date-pill {
+  animation: stagger-enter 260ms var(--ease-out) backwards;
+}
+.date-strip > .date-pill:nth-child(1) { animation-delay: 0ms; }
+.date-strip > .date-pill:nth-child(2) { animation-delay: 30ms; }
+.date-strip > .date-pill:nth-child(3) { animation-delay: 60ms; }
+.date-strip > .date-pill:nth-child(4) { animation-delay: 90ms; }
+.date-strip > .date-pill:nth-child(5) { animation-delay: 120ms; }
+.date-strip > .date-pill:nth-child(6) { animation-delay: 150ms; }
+.date-strip > .date-pill:nth-child(n + 7) { animation-delay: 180ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .date-strip > .date-pill {
+    animation: none;
+  }
+}
+
 /* Block tab bar (within a selected training day). */
 
 .block-tabbar {
@@ -118,6 +136,46 @@
   gap: 0.65rem;
 }
 
+/* Stagger lift-card entry so the first day of lifts loads in like
+   a deck of cards. Capped at 6 items so a long week of lifts
+   doesn't take forever to all appear. backwards keeps items in
+   their starting state during the delay. */
+.lift-card-list > .lift-card,
+.lift-block-stack > .lift-block-group {
+  animation: stagger-enter 280ms var(--ease-out) backwards;
+}
+
+.lift-card-list > .lift-card:nth-child(1),
+.lift-block-stack > .lift-block-group:nth-child(1) { animation-delay: 0ms; }
+.lift-card-list > .lift-card:nth-child(2),
+.lift-block-stack > .lift-block-group:nth-child(2) { animation-delay: 40ms; }
+.lift-card-list > .lift-card:nth-child(3),
+.lift-block-stack > .lift-block-group:nth-child(3) { animation-delay: 80ms; }
+.lift-card-list > .lift-card:nth-child(4),
+.lift-block-stack > .lift-block-group:nth-child(4) { animation-delay: 120ms; }
+.lift-card-list > .lift-card:nth-child(5),
+.lift-block-stack > .lift-block-group:nth-child(5) { animation-delay: 160ms; }
+.lift-card-list > .lift-card:nth-child(n + 6),
+.lift-block-stack > .lift-block-group:nth-child(n + 6) { animation-delay: 200ms; }
+
+@keyframes stagger-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lift-card-list > .lift-card,
+  .lift-block-stack > .lift-block-group {
+    animation: none;
+  }
+}
+
 .lift-card,
 .history-week,
 .lift-block-group,
@@ -127,6 +185,15 @@
   border-radius: 24px;
   background: var(--surface);
   padding: 1rem;
+}
+
+/* When the athlete marks a lift complete, transition into the green
+   tint instead of snapping. Don't transition all — be specific so we
+   don't accidentally animate layout properties. */
+.lift-card {
+  transition:
+    background 220ms var(--ease-out),
+    border-color 220ms var(--ease-out);
 }
 
 .page-stack .lift-block-group,
@@ -217,9 +284,9 @@
   font-weight: 600;
   min-height: 52px;
   transition:
-    color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+    color 200ms var(--ease-out),
+    background 200ms var(--ease-out),
+    transform 160ms var(--ease-out);
 }
 
 .ios-tab .tab-icon {
@@ -247,7 +314,17 @@
   transform: translateY(-1px);
 }
 
-.ios-tab.is-active::before {
+.ios-tab {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
+
+/* Pill always rendered, opacity 0 by default. Crossfade between tabs
+   feels smoother than the previous instant-render-on-active swap.
+   A true sliding indicator would need a single shared element + JS
+   to track position; opacity transition is the CSS-only equivalent. */
+.ios-tab::before {
   content: "";
   position: absolute;
   top: 0.45rem;
@@ -256,12 +333,16 @@
   border-radius: 999px;
   background: var(--accent-soft);
   z-index: -1;
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
 }
 
-.ios-tab {
-  position: relative;
-  z-index: 0;
-  isolation: isolate;
+.ios-tab.is-active::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
 @media (prefers-reduced-motion: reduce) {
