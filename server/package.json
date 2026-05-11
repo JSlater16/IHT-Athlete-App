@@ -12,7 +12,7 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma migrate deploy",
     "bootstrap:owner": "node scripts/bootstrapOwner.js",
-    "db:init": "sqlite3 prisma/dev.db < prisma/bootstrap.sql",
+    "import:sqlite": "node scripts/importFromSqlite.js",
     "import:program-csv": "node scripts/importProgramCsv.js",
     "import:program-folder": "node scripts/importProgramFolder.js",
     "seed": "prisma db seed"
@@ -20,6 +20,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.5.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
