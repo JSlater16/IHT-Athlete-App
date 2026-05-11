@@ -89,9 +89,15 @@ export default function HexChartModal({ open, athleteId, athleteName, onClose })
                   </span>
                 </span>
                 <span className="fd-hex-legend-item">
-                  <span className="fd-hex-legend-swatch is-pr" /> Personal best (perimeter = 100%)
+                  <span className="fd-hex-legend-swatch is-pr" /> Personal best
+                </span>
+                <span className="fd-hex-legend-item">
+                  <span className="fd-hex-legend-swatch is-flag" /> Below 60% of PR
                 </span>
               </div>
+              <p className="fd-hex-scale-note">
+                Scale: chart center = 60% of PR · perimeter = PR · concentric rings = 70 / 80 / 90%
+              </p>
             </>
           )}
         </div>

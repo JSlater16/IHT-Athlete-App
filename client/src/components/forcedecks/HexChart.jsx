@@ -7,6 +7,21 @@ const DEFAULT_SIZE = 520;
 const LABEL_PAD = 18;
 const RINGS = [0.25, 0.5, 0.75, 1.0];
 
+// Visual scale floor. Anything at or below this fraction of PR is
+// drawn at the center of the chart; anything at PR is drawn at the
+// perimeter; values in between are rescaled to fill the radius.
+// This dramatically amplifies the visible difference between an
+// athlete who's near their PR (e.g. 95%) and one who's regressed
+// (e.g. 75%) — without it, both polygons hug the perimeter.
+const SCALE_FLOOR = 0.6;
+const SCALE_RANGE = 1 - SCALE_FLOOR;
+
+function rescale(ratio) {
+  if (!Number.isFinite(ratio) || ratio <= SCALE_FLOOR) return 0;
+  if (ratio >= 1) return 1;
+  return (ratio - SCALE_FLOOR) / SCALE_RANGE;
+}
+
 function polarToCartesian(cx, cy, r, angle) {
   return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
 }
@@ -45,16 +60,25 @@ export default function HexChart({ metrics, latestMetrics, bests, size = DEFAULT
   // PR perimeter = the outer hex polygon.
   const prPoints = angles.map((a) => polarToCartesian(cx, cy, R, a));
 
-  // Latest polygon = each spoke at radius R * (latest/best).
-  const latestPoints = metrics.map((m, i) => {
+  // Latest polygon = each spoke at radius R * rescale(latest / best).
+  // Rescaling lifts ratios from the [0, 1] linear scale onto a
+  // [SCALE_FLOOR, 1] -> [0, 1] window so subtle PR deficits become
+  // visually obvious instead of getting buried at the perimeter.
+  const latestData = metrics.map((m, i) => {
     const best = bests?.[m.key];
     const latestVal = latestMetrics?.[m.key]?.value;
     const ratio =
       Number.isFinite(latestVal) && Number.isFinite(best) && best > 0
         ? Math.min(1, latestVal / best)
         : 0;
-    return polarToCartesian(cx, cy, R * ratio, angles[i]);
+    const isBelowFloor = ratio > 0 && ratio < SCALE_FLOOR;
+    return {
+      point: polarToCartesian(cx, cy, R * rescale(ratio), angles[i]),
+      ratio,
+      isBelowFloor
+    };
   });
+  const latestPoints = latestData.map((d) => d.point);
 
   return (
     <svg
@@ -102,15 +126,25 @@ export default function HexChart({ metrics, latestMetrics, bests, size = DEFAULT
       {/* Latest polygon — filled cyan */}
       <polygon
         points={pointsString(latestPoints)}
-        fill="rgba(30, 227, 214, 0.32)"
+        fill="rgba(30, 227, 214, 0.42)"
         stroke="#1EE3D6"
-        strokeWidth="2"
+        strokeWidth="2.5"
         strokeLinejoin="miter"
       />
 
-      {/* Vertex dots for the latest polygon */}
-      {latestPoints.map(([x, y], i) => (
-        <circle key={`dot-${i}`} cx={x} cy={y} r={3} fill="#1EE3D6" />
+      {/* Vertex dots for the latest polygon. Below-floor metrics
+         (severely off PR) get a red dot so they stand out even when
+         the polygon stays at center. */}
+      {latestData.map(({ point: [x, y], isBelowFloor }, i) => (
+        <circle
+          key={`dot-${i}`}
+          cx={x}
+          cy={y}
+          r={isBelowFloor ? 5 : 4}
+          fill={isBelowFloor ? "#ef4444" : "#1EE3D6"}
+          stroke="#071018"
+          strokeWidth="1.5"
+        />
       ))}
 
       {/* Spoke labels */}

@@ -432,10 +432,29 @@
   border: 1.5px dashed rgba(243, 246, 248, 0.55);
 }
 
+.fd-hex-legend-swatch.is-flag {
+  background: var(--fd-danger);
+  border: 1.5px solid var(--fd-bg);
+  width: 12px;
+  height: 12px;
+  /* The dot in the chart is round; legend swatch should match. The
+     module-wide border-radius:0 forces this to a square instead.
+     Override it here only — the visual cue is what matters. */
+  border-radius: 999px !important;
+}
+
 .fd-hex-legend-date {
   margin-left: 0.35rem;
   font-variant-numeric: tabular-nums;
   color: var(--fd-fg);
+}
+
+.fd-hex-scale-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: var(--fd-muted);
+  text-align: center;
+  letter-spacing: 0.02em;
 }
 
 .fd-report-spinner {
