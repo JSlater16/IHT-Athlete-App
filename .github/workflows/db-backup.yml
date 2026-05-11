@@ -1,0 +1,84 @@
+name: Database backup
+
+# Nightly encrypted pg_dump uploaded as a GitHub Release asset.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   BACKUP_DATABASE_URL  External Postgres URL from Render (postgresql://...)
+#   BACKUP_PASSPHRASE    Long random string used to encrypt each dump with AES256
+#
+# Restore (locally):
+#   gpg --decrypt --passphrase "$BACKUP_PASSPHRASE" --batch liftapp-...sql.gz.gpg | gunzip | psql "$TARGET_DATABASE_URL"
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # 06:00 UTC daily (~01:00 CST / 02:00 CDT)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Verify tools
+        run: |
+          pg_dump --version
+          gpg --version | head -1
+          gh --version | head -1
+
+      - name: Dump, compress, and encrypt
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "BACKUP_DATABASE_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "BACKUP_PASSPHRASE secret is not set"
+            exit 1
+          fi
+          STAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+          FILE="liftapp-${STAMP}.sql.gz.gpg"
+          pg_dump --no-owner --no-acl --no-comments "$DATABASE_URL" \
+            | gzip -9 \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 \
+                --passphrase "$BACKUP_PASSPHRASE" \
+                --output "$FILE"
+          ls -lh "$FILE"
+          echo "BACKUP_FILE=$FILE" >> "$GITHUB_ENV"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+
+      - name: Upload backup as release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: backup-${{ env.STAMP }}
+          name: Backup ${{ env.STAMP }}
+          files: ${{ env.BACKUP_FILE }}
+          prerelease: true
+          make_latest: false
+          body: |
+            Encrypted Postgres dump.
+            Decrypt with: gpg --decrypt --passphrase "<BACKUP_PASSPHRASE>" --batch <file>
+
+      - name: Prune backups older than 14 days
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cutoff=$(( $(date -u +%s) - 14 * 86400 ))
+          gh release list --limit 200 --json tagName,createdAt \
+            -q '.[] | select(.tagName | startswith("backup-")) | "\(.createdAt) \(.tagName)"' \
+            | while read -r created tag; do
+                age=$(date -u -d "$created" +%s)
+                if [ "$age" -lt "$cutoff" ]; then
+                  echo "Deleting $tag (created $created)"
+                  gh release delete "$tag" --yes --cleanup-tag || true
+                fi
+              done
