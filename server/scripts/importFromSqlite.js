@@ -43,12 +43,20 @@ async function importUsers(sqlite, prisma) {
   const rows = sqlite.prepare("SELECT * FROM User").all();
   let imported = 0;
   let skipped = 0;
+  let displaced = 0;
   for (const u of rows) {
     const role = normalizeRole(u.role);
     if (!role) {
       console.warn(`  skipping user ${u.email}: invalid role '${u.role}'`);
       skipped++;
       continue;
+    }
+    const removed = await prisma.user.deleteMany({
+      where: { email: u.email, NOT: { id: u.id } },
+    });
+    if (removed.count > 0) {
+      displaced += removed.count;
+      console.log(`  displaced existing user with email ${u.email} (kept SQLite id ${u.id})`);
     }
     await prisma.user.upsert({
       where: { id: u.id },
@@ -74,7 +82,7 @@ async function importUsers(sqlite, prisma) {
     });
     imported++;
   }
-  console.log(`Users: ${imported} imported, ${skipped} skipped (of ${rows.length})`);
+  console.log(`Users: ${imported} imported, ${skipped} skipped, ${displaced} displaced (of ${rows.length})`);
 }
 
 async function importAthleteProfiles(sqlite, prisma) {
