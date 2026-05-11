@@ -3,16 +3,16 @@ import { Link, useParams } from "react-router-dom";
 import { apiRequest } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import ForcedecksDashboard from "../../components/forcedecks/ForcedecksDashboard";
-import ReportModal from "../../components/forcedecks/ReportModal";
+import HexChartModal from "../../components/forcedecks/HexChartModal";
 
 // Coach drill-down: dashboard for one specific athlete. Header shows
 // the athlete's name + a back link to the roster, plus a button that
-// opens the AI-generated report modal.
+// opens the hex-chart modal (latest test vs PR).
 export default function CoachForceDecksAthletePage() {
   const { athleteId } = useParams();
   const { token } = useAuth();
   const [name, setName] = useState("");
-  const [reportOpen, setReportOpen] = useState(false);
+  const [hexOpen, setHexOpen] = useState(false);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -42,20 +42,20 @@ export default function CoachForceDecksAthletePage() {
               <button
                 type="button"
                 className="fd-report-button"
-                onClick={() => setReportOpen(true)}
+                onClick={() => setHexOpen(true)}
               >
-                Generate AI Report
+                View Hex Chart
               </button>
             </div>
           </header>
         }
       />
 
-      <ReportModal
-        open={reportOpen}
+      <HexChartModal
+        open={hexOpen}
         athleteId={athleteId}
         athleteName={name || "Athlete"}
-        onClose={() => setReportOpen(false)}
+        onClose={() => setHexOpen(false)}
       />
     </>
   );

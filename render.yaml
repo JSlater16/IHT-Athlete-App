@@ -35,5 +35,3 @@ services:
         value: david@ihthumanperformance.com
       - key: OWNER_PASSWORD
         sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false

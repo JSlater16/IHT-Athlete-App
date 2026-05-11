@@ -3,8 +3,6 @@ const { prisma } = require("../utils/prisma");
 const { requireAthlete, requireCoach } = require("../middleware/auth");
 const { recordAudit } = require("../utils/audit");
 const { METRICS, isValidMetricKey } = require("../utils/forcedecks");
-const { generateForceDecksReport, Anthropic } = require("../utils/forcedecksReport");
-const { aiReportLimiter } = require("../utils/rateLimiters");
 
 const router = express.Router();
 
@@ -247,75 +245,6 @@ router.post("/athletes/:athleteId", requireCoach, async (req, res, next) => {
     });
 
     return res.status(existing ? 200 : 201).json({ test: serializeTest(test) });
-  } catch (error) {
-    return next(error);
-  }
-});
-
-// POST /api/forcedecks/athletes/:athleteId/report
-// Generates an AI performance report via Anthropic. Coach/owner only.
-router.post("/athletes/:athleteId/report", aiReportLimiter, requireCoach, async (req, res, next) => {
-  try {
-    const profile = await prisma.athleteProfile.findUnique({
-      where: { id: req.params.athleteId },
-      select: { id: true, user: { select: { name: true } } }
-    });
-    if (!profile) {
-      return res.status(404).json({ error: "Athlete not found" });
-    }
-
-    const data = await loadAthleteDashboard(profile.id, 5);
-    if (!data.tests.length) {
-      return res.status(400).json({ error: "No ForceDecks tests available for this athlete." });
-    }
-
-    let report;
-    try {
-      report = await generateForceDecksReport({
-        athleteName: profile.user.name,
-        tests: data.tests,
-        bests: data.bests
-      });
-    } catch (error) {
-      // Translate provider errors into clean client-facing responses.
-      if (error?.status === 503) {
-        return res.status(503).json({ error: error.message });
-      }
-      if (error instanceof Anthropic.RateLimitError) {
-        return res.status(503).json({ error: "AI service is rate-limited right now. Try again in a minute." });
-      }
-      if (error instanceof Anthropic.AuthenticationError) {
-        return res.status(503).json({ error: "AI service is misconfigured on the server." });
-      }
-      if (error instanceof Anthropic.APIError) {
-        return res.status(502).json({ error: `AI service error: ${error.message}` });
-      }
-      throw error;
-    }
-
-    await recordAudit({
-      req,
-      action: "forcedecks.report_generate",
-      targetType: "athlete_profile",
-      targetId: profile.id,
-      targetLabel: profile.user.name,
-      metadata: {
-        model: report.model,
-        testCount: data.tests.length,
-        inputTokens: report.usage?.input_tokens,
-        outputTokens: report.usage?.output_tokens,
-        cacheReadTokens: report.usage?.cache_read_input_tokens,
-        stopReason: report.stopReason
-      }
-    });
-
-    return res.json({
-      athleteId: profile.id,
-      name: profile.user.name,
-      generatedAt: new Date().toISOString(),
-      text: report.text,
-      model: report.model
-    });
   } catch (error) {
     return next(error);
   }
