@@ -29,19 +29,20 @@ model User {
 }
 
 model AthleteProfile {
-  id              String      @id @default(cuid())
-  userId          String      @unique
+  id              String           @id @default(cuid())
+  userId          String           @unique
   phase           String
-  phaseStartedAt  DateTime    @default(now())
-  coachNotes      String      @default("")
-  rehabProfile    String      @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
-  programmingDays Int         @default(3)
-  trainingModel   String      @default("10-Week")
-  programVariant  String      @default("Standard")
-  updatedAt       DateTime    @updatedAt
-  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phaseStartedAt  DateTime         @default(now())
+  coachNotes      String           @default("")
+  rehabProfile    String           @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
+  programmingDays Int              @default(3)
+  trainingModel   String           @default("10-Week")
+  programVariant  String           @default("Standard")
+  updatedAt       DateTime         @updatedAt
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   lifts           Lift[]
   rehabNotes      RehabNote[]
+  forcedecksTests ForceDecksTest[]
 }
 
 model Lift {
@@ -70,6 +71,37 @@ model RehabNote {
   athlete   AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@index([athleteId, createdAt])
+}
+
+// VALD ForceDecks test results. One row per test session, with N
+// child ForceDecksMetric rows (one per measured metric). Readiness
+// score is computed externally (CV-based formula) and stored here
+// directly — no business logic on this end. externalId is the VALD
+// test id, used for idempotent ingest.
+model ForceDecksTest {
+  id             String             @id @default(cuid())
+  athleteId      String
+  testDate       DateTime
+  readinessScore Int?
+  source         String             @default("vald")
+  externalId     String?            @unique
+  createdAt      DateTime           @default(now())
+  athlete        AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  metrics        ForceDecksMetric[]
+
+  @@index([athleteId, testDate])
+}
+
+model ForceDecksMetric {
+  id         String         @id @default(cuid())
+  testId     String
+  metricName String
+  value      Float
+  unit       String
+  test       ForceDecksTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, metricName])
+  @@index([metricName])
 }
 
 // Audit trail for high-trust admin actions (coach lifecycle, athlete

@@ -106,3 +106,17 @@ export function AuditIcon(props) {
     </Icon>
   );
 }
+
+/* ForceDecks — stylized vertical bars (force plates / jump data).
+   Reads as "performance" without leaning on a literal jump arc. */
+export function ForceDecksIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20V11" />
+      <path d="M9 20V6" />
+      <path d="M14 20V8" />
+      <path d="M19 20V13" />
+      <path d="M3 20h18" />
+    </Icon>
+  );
+}

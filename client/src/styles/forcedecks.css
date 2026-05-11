@@ -1,0 +1,326 @@
+/* ForceDecks module. Sharp, performance-oriented aesthetic — black
+   background, near-white text, cyan accent, NO rounded corners.
+   Module-scoped via the .fd-module wrapper so the rest of the app
+   keeps its rounded look. */
+
+.fd-module {
+  --fd-bg: #071018;
+  --fd-fg: #f3f6f8;
+  --fd-accent: #1ee3d6;
+  --fd-muted: rgba(243, 246, 248, 0.55);
+  --fd-line: rgba(243, 246, 248, 0.12);
+  --fd-line-strong: rgba(243, 246, 248, 0.22);
+  --fd-danger: #ef4444;
+
+  background: var(--fd-bg);
+  color: var(--fd-fg);
+  /* Stretch to fill the parent route area; coach-main is a flex/grid
+     content column and athlete-main is the scrollable middle section. */
+  min-height: 100%;
+  padding: 1.25rem 1rem 1.5rem;
+}
+
+/* Kill every rounded corner inside the module. Overrides inherited
+   border-radius from buttons/cards defined elsewhere. */
+.fd-module *,
+.fd-module *::before,
+.fd-module *::after {
+  border-radius: 0 !important;
+}
+
+.fd-page {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.fd-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  border-bottom: 1px solid var(--fd-line);
+  padding-bottom: 1rem;
+}
+
+.fd-page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+  color: var(--fd-fg);
+}
+
+.fd-page-sub {
+  margin: 0.35rem 0 0;
+  color: var(--fd-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.fd-back-link {
+  display: inline-block;
+  color: var(--fd-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+  text-decoration: none;
+  transition: color 160ms var(--ease-out);
+}
+
+.fd-back-link:hover {
+  color: var(--fd-accent);
+}
+
+/* Readiness block ------------------------------------------------- */
+
+.fd-readiness-block {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.fd-readiness-ring {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.fd-readiness-ring svg {
+  width: 168px;
+  height: 168px;
+}
+
+.fd-readiness-meta {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.fd-readiness-meta-label {
+  color: var(--fd-muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fd-readiness-meta-date {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Metric grid ----------------------------------------------------- */
+
+.fd-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.fd-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--fd-line);
+  padding: 1rem 1.15rem;
+  transition: border-color 160ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fd-card:hover {
+    border-color: var(--fd-line-strong);
+  }
+}
+
+.fd-metric-card {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.fd-metric-name {
+  color: var(--fd-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.fd-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.fd-metric-value {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fd-fg);
+}
+
+.fd-metric-unit {
+  font-size: 0.78rem;
+  color: var(--fd-muted);
+  margin-left: 0.3rem;
+  letter-spacing: 0.02em;
+}
+
+.fd-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fd-badge.is-pr {
+  color: var(--fd-accent);
+}
+
+.fd-badge.is-up {
+  color: var(--fd-accent);
+}
+
+.fd-badge.is-down {
+  color: var(--fd-danger);
+}
+
+.fd-badge.is-empty {
+  color: var(--fd-muted);
+  opacity: 0.5;
+}
+
+/* Sparkline ------------------------------------------------------- */
+
+.fd-sparkline {
+  width: 80px;
+  height: 24px;
+  stroke: var(--fd-accent);
+  stroke-width: 1.5;
+  fill: none;
+  flex: 0 0 auto;
+}
+
+/* Empty / error states ------------------------------------------- */
+
+.fd-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--fd-muted);
+  border: 1px dashed var(--fd-line);
+  font-size: 0.95rem;
+}
+
+.fd-empty-error {
+  color: var(--fd-danger);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Coach roster table --------------------------------------------- */
+
+.fd-roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.fd-roster-table thead th {
+  text-align: left;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--fd-muted);
+  padding: 0.85rem 0.75rem;
+  border-bottom: 1px solid var(--fd-line);
+}
+
+.fd-roster-table td {
+  padding: 1rem 0.75rem;
+  border-bottom: 1px solid var(--fd-line);
+  font-variant-numeric: tabular-nums;
+}
+
+.fd-roster-row {
+  cursor: pointer;
+  transition: background 160ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fd-roster-row:hover {
+    background: rgba(30, 227, 214, 0.06);
+  }
+}
+
+.fd-roster-row:focus-visible {
+  outline: none;
+  background: rgba(30, 227, 214, 0.08);
+  box-shadow: inset 0 0 0 1px var(--fd-accent);
+}
+
+.fd-roster-name {
+  font-weight: 700;
+  color: var(--fd-fg);
+  font-variant-numeric: normal;
+}
+
+.fd-roster-date {
+  color: var(--fd-muted);
+}
+
+.fd-roster-readiness {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.fd-roster-delta.is-down {
+  color: var(--fd-danger);
+}
+
+.fd-row-flagged {
+  border-left: 3px solid var(--fd-accent);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.fd-flag-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--fd-danger);
+  /* the global !important on border-radius keeps this from being a
+     circle, so we draw a small square instead — fits the aesthetic */
+}
+
+/* Reduced motion ------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-card,
+  .fd-roster-row,
+  .fd-back-link {
+    transition: none;
+  }
+}
+
+/* Tighten on small screens */
+@media (max-width: 640px) {
+  .fd-module {
+    padding: 1rem 0.75rem 1.25rem;
+  }
+  .fd-readiness-block {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+  .fd-readiness-ring svg {
+    width: 140px;
+    height: 140px;
+  }
+  .fd-metric-grid {
+    grid-template-columns: 1fr;
+  }
+  .fd-roster-table {
+    font-size: 0.85rem;
+  }
+}

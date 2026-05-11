@@ -1,0 +1,253 @@
+const express = require("express");
+const { prisma } = require("../utils/prisma");
+const { requireAthlete, requireCoach } = require("../middleware/auth");
+const { recordAudit } = require("../utils/audit");
+const { METRICS, isValidMetricKey } = require("../utils/forcedecks");
+
+const router = express.Router();
+
+const DEFAULT_LIMIT = 3;
+const MAX_LIMIT = 20;
+
+function parseLimit(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LIMIT;
+  return Math.min(Math.floor(parsed), MAX_LIMIT);
+}
+
+function serializeTest(test) {
+  const metrics = {};
+  for (const m of test.metrics || []) {
+    metrics[m.metricName] = { value: m.value, unit: m.unit };
+  }
+  return {
+    id: test.id,
+    testDate: test.testDate,
+    readinessScore: test.readinessScore,
+    source: test.source,
+    externalId: test.externalId,
+    metrics
+  };
+}
+
+async function loadAthleteDashboard(athleteId, limit) {
+  // Newest tests first; UI consumes them in order.
+  const tests = await prisma.forceDecksTest.findMany({
+    where: { athleteId },
+    orderBy: { testDate: "desc" },
+    take: limit,
+    include: { metrics: true }
+  });
+
+  // Per-metric all-time PR for this athlete; powers the "% from PR" badge.
+  const maxRows = await prisma.forceDecksMetric.groupBy({
+    by: ["metricName"],
+    where: { test: { athleteId } },
+    _max: { value: true }
+  });
+  const bests = {};
+  for (const row of maxRows) {
+    if (row._max?.value !== null && row._max?.value !== undefined) {
+      bests[row.metricName] = row._max.value;
+    }
+  }
+
+  return {
+    tests: tests.map(serializeTest),
+    bests,
+    metricCatalog: METRICS
+  };
+}
+
+// GET /api/forcedecks/me — athlete sees their own latest tests
+router.get("/me", requireAthlete, async (req, res, next) => {
+  try {
+    const profile = await prisma.athleteProfile.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true }
+    });
+    if (!profile) {
+      return res.json({ tests: [], bests: {}, metricCatalog: METRICS });
+    }
+    const limit = parseLimit(req.query.limit);
+    const payload = await loadAthleteDashboard(profile.id, limit);
+    return res.json(payload);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// GET /api/forcedecks/roster — coach sees every athlete's latest + previous
+router.get("/roster", requireCoach, async (req, res, next) => {
+  try {
+    const athletes = await prisma.athleteProfile.findMany({
+      select: {
+        id: true,
+        user: { select: { name: true, email: true, isActive: true } },
+        forcedecksTests: {
+          orderBy: { testDate: "desc" },
+          take: 2,
+          select: { testDate: true, readinessScore: true }
+        }
+      }
+    });
+
+    const rows = athletes
+      .filter((a) => a.user?.isActive !== false)
+      .map((a) => {
+        const [latest = null, previous = null] = a.forcedecksTests;
+        const delta =
+          latest?.readinessScore != null && previous?.readinessScore != null
+            ? latest.readinessScore - previous.readinessScore
+            : null;
+        const flagged = delta !== null && delta < -10;
+        return {
+          athleteId: a.id,
+          name: a.user.name,
+          email: a.user.email,
+          latest: latest ? { testDate: latest.testDate, readinessScore: latest.readinessScore } : null,
+          previous: previous
+            ? { testDate: previous.testDate, readinessScore: previous.readinessScore }
+            : null,
+          delta,
+          flagged
+        };
+      })
+      .sort((a, b) => {
+        // Flagged first, then most recent test first, then name.
+        if (a.flagged !== b.flagged) return a.flagged ? -1 : 1;
+        const at = a.latest?.testDate ? new Date(a.latest.testDate).getTime() : 0;
+        const bt = b.latest?.testDate ? new Date(b.latest.testDate).getTime() : 0;
+        if (at !== bt) return bt - at;
+        return a.name.localeCompare(b.name);
+      });
+
+    return res.json({ athletes: rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// GET /api/forcedecks/athletes/:athleteId — coach drill-down
+router.get("/athletes/:athleteId", requireCoach, async (req, res, next) => {
+  try {
+    const profile = await prisma.athleteProfile.findUnique({
+      where: { id: req.params.athleteId },
+      select: { id: true, user: { select: { name: true } } }
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+    const limit = parseLimit(req.query.limit);
+    const payload = await loadAthleteDashboard(profile.id, limit);
+    return res.json({ athleteId: profile.id, name: profile.user.name, ...payload });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// POST /api/forcedecks/athletes/:athleteId — ingest a single test
+// Idempotent on externalId when present.
+router.post("/athletes/:athleteId", requireCoach, async (req, res, next) => {
+  try {
+    const profile = await prisma.athleteProfile.findUnique({
+      where: { id: req.params.athleteId },
+      select: { id: true, user: { select: { name: true } } }
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+
+    const { testDate, readinessScore, source, externalId, metrics } = req.body || {};
+
+    if (!testDate || Number.isNaN(new Date(testDate).getTime())) {
+      return res.status(400).json({ error: "testDate is required and must be a valid date" });
+    }
+    if (readinessScore != null) {
+      const score = Number(readinessScore);
+      if (!Number.isFinite(score) || score < 0 || score > 100) {
+        return res.status(400).json({ error: "readinessScore must be 0-100 or null" });
+      }
+    }
+    if (!Array.isArray(metrics) || metrics.length === 0) {
+      return res.status(400).json({ error: "metrics must be a non-empty array" });
+    }
+    for (const m of metrics) {
+      if (!isValidMetricKey(m?.metricName)) {
+        return res.status(400).json({ error: `Unknown metricName: ${m?.metricName}` });
+      }
+      if (!Number.isFinite(Number(m.value))) {
+        return res.status(400).json({ error: `Invalid value for ${m.metricName}` });
+      }
+      if (typeof m.unit !== "string" || m.unit.length > 32) {
+        return res.status(400).json({ error: `Invalid unit for ${m.metricName}` });
+      }
+    }
+
+    // Idempotent on externalId: if a test with this externalId exists,
+    // update it and replace metrics. Otherwise create new.
+    const existing = externalId
+      ? await prisma.forceDecksTest.findUnique({ where: { externalId } })
+      : null;
+
+    const test = await prisma.$transaction(async (tx) => {
+      if (existing) {
+        await tx.forceDecksMetric.deleteMany({ where: { testId: existing.id } });
+        return tx.forceDecksTest.update({
+          where: { id: existing.id },
+          data: {
+            athleteId: profile.id,
+            testDate: new Date(testDate),
+            readinessScore: readinessScore != null ? Math.round(Number(readinessScore)) : null,
+            source: typeof source === "string" ? source : "vald",
+            metrics: {
+              create: metrics.map((m) => ({
+                metricName: m.metricName,
+                value: Number(m.value),
+                unit: m.unit
+              }))
+            }
+          },
+          include: { metrics: true }
+        });
+      }
+      return tx.forceDecksTest.create({
+        data: {
+          athleteId: profile.id,
+          testDate: new Date(testDate),
+          readinessScore: readinessScore != null ? Math.round(Number(readinessScore)) : null,
+          source: typeof source === "string" ? source : "vald",
+          externalId: externalId || null,
+          metrics: {
+            create: metrics.map((m) => ({
+              metricName: m.metricName,
+              value: Number(m.value),
+              unit: m.unit
+            }))
+          }
+        },
+        include: { metrics: true }
+      });
+    });
+
+    await recordAudit({
+      req,
+      action: "forcedecks.ingest",
+      targetType: "forcedecks_test",
+      targetId: test.id,
+      targetLabel: profile.user.name,
+      metadata: {
+        externalId: test.externalId,
+        metricCount: test.metrics.length,
+        readinessScore: test.readinessScore,
+        replaced: Boolean(existing)
+      }
+    });
+
+    return res.status(existing ? 200 : 201).json({ test: serializeTest(test) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+module.exports = router;
