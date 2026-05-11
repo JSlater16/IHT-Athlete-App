@@ -1,17 +1,50 @@
 "use strict";
 
-// One-shot PWA icon generator. Produces two solid placeholder PNGs:
-//   public/pwa-192.png  -- 192x192, #1EE3D6 circle on #071018
-//   public/pwa-512.png  -- 512x512, same artwork
-// Uses only Node built-ins (zlib for DEFLATE) -- no native dependencies.
+// PWA icon generator. Renders 192/512 PNG icons by fitting the IHT
+// logo onto the brand background with ~12% padding.
+//
+// Override the source with PWA_ICON_SOURCE=<path>.
+// When sharp is unavailable, falls back to a procedural placeholder
+// (#1EE3D6 circle on #071018) so the build still succeeds.
 
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-const BG = [0x07, 0x10, 0x18, 0xff];
-const FG = [0x1e, 0xe3, 0xd6, 0xff];
-const OUT_DIR = path.join(__dirname, "..", "public");
+const BG_HEX = "#071018";
+const BG_RGBA = { r: 0x07, g: 0x10, b: 0x18, alpha: 1 };
+const FALLBACK_FG = [0x1e, 0xe3, 0xd6, 0xff];
+const FALLBACK_BG = [0x07, 0x10, 0x18, 0xff];
+
+const PUBLIC_DIR = path.join(__dirname, "..", "public");
+const SOURCE = process.env.PWA_ICON_SOURCE || path.join(PUBLIC_DIR, "iht-logo.png");
+const SIZES = [192, 512];
+const PADDING_RATIO = 0.12;
+
+async function renderWithSharp(size) {
+  const sharp = require("sharp");
+  const inner = Math.round(size * (1 - PADDING_RATIO * 2));
+  const logo = await sharp(SOURCE)
+    .resize({ width: inner, height: inner, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+
+  const composed = await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: BG_RGBA,
+    },
+  })
+    .composite([{ input: logo, gravity: "center" }])
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+
+  return composed;
+}
+
+// ---- Pure-Node fallback (used only if sharp fails to load) ----
 
 let crcTable = null;
 function crc32(buf) {
@@ -37,7 +70,7 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crc]);
 }
 
-function makePng(size) {
+function renderFallback(size) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
@@ -56,7 +89,7 @@ function makePng(size) {
     for (let x = 0; x < size; x++) {
       const dx = x - cx;
       const dy = y - cy;
-      const c = dx * dx + dy * dy <= r2 ? FG : BG;
+      const c = dx * dx + dy * dy <= r2 ? FALLBACK_FG : FALLBACK_BG;
       const off = y * stride + 1 + x * 4;
       raw[off] = c[0];
       raw[off + 1] = c[1];
@@ -74,9 +107,28 @@ function makePng(size) {
   ]);
 }
 
-for (const size of [192, 512]) {
-  const outPath = path.join(OUT_DIR, `pwa-${size}.png`);
-  fs.writeFileSync(outPath, makePng(size));
-  const stat = fs.statSync(outPath);
-  console.log(`wrote ${outPath} (${size}x${size}, ${stat.size} bytes)`);
-}
+(async () => {
+  let useSharp = true;
+  try {
+    require.resolve("sharp");
+  } catch {
+    useSharp = false;
+  }
+
+  if (useSharp && !fs.existsSync(SOURCE)) {
+    console.warn(`Source not found at ${SOURCE}; using procedural placeholder.`);
+    useSharp = false;
+  }
+
+  console.log(useSharp ? `Rendering from ${SOURCE} on ${BG_HEX}` : "Rendering procedural placeholder");
+
+  for (const size of SIZES) {
+    const outPath = path.join(PUBLIC_DIR, `pwa-${size}.png`);
+    const buffer = useSharp ? await renderWithSharp(size) : renderFallback(size);
+    fs.writeFileSync(outPath, buffer);
+    console.log(`wrote ${outPath} (${size}x${size}, ${buffer.length} bytes)`);
+  }
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
