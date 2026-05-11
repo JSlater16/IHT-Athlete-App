@@ -27,7 +27,19 @@ const passwordChangeLimiter = rateLimit({
   legacyHeaders: false
 });
 
+/* AI report generation calls the Anthropic API and bills per call.
+   30 generations/hour per IP comfortably supports a coach reviewing
+   the whole roster but caps runaway burn from button-mashing. */
+const aiReportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  message: { error: "Too many report generations this hour. Try again later." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 module.exports = {
   loginLimiter,
-  passwordChangeLimiter
+  passwordChangeLimiter,
+  aiReportLimiter
 };

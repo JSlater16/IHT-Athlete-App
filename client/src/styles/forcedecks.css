@@ -303,6 +303,152 @@
   }
 }
 
+/* AI report button + modal ---------------------------------------- */
+
+.fd-page-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.fd-report-button {
+  background: var(--fd-accent);
+  color: var(--fd-bg);
+  border: none;
+  padding: 0.7rem 1.1rem;
+  font-weight: 700;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fd-report-button:hover {
+    opacity: 0.88;
+  }
+}
+
+.fd-report-button:active {
+  transform: scale(0.97);
+}
+
+.fd-report-modal {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 1rem;
+  max-height: calc(100dvh - 2rem);
+  /* The base .modal-card-wide adds a white background — override
+     for the sharp fd aesthetic. */
+  background: var(--fd-bg) !important;
+  color: var(--fd-fg);
+}
+
+.fd-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--fd-line);
+}
+
+.fd-report-title {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--fd-fg);
+}
+
+.fd-report-sub {
+  margin: 0.25rem 0 0;
+  color: var(--fd-muted);
+  font-size: 0.86rem;
+}
+
+.fd-report-close {
+  background: transparent;
+  color: var(--fd-fg);
+  border: 1px solid var(--fd-line);
+  width: 36px;
+  height: 36px;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.fd-report-body {
+  overflow-y: auto;
+  min-height: 200px;
+  padding-right: 0.25rem;
+}
+
+.fd-report-content {
+  display: grid;
+  gap: 0.85rem;
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+.fd-report-heading {
+  margin: 0.4rem 0 0.1rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fd-accent);
+  font-weight: 700;
+}
+
+.fd-report-paragraph {
+  margin: 0;
+  color: var(--fd-fg);
+}
+
+.fd-report-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.fd-report-list li {
+  color: var(--fd-fg);
+}
+
+.fd-report-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 0.55rem;
+  border: 2px solid var(--fd-line);
+  border-top-color: var(--fd-accent);
+  animation: fd-spin 0.9s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes fd-spin {
+  to { transform: rotate(360deg); }
+}
+
+.fd-report-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--fd-line);
+}
+
+.fd-report-meta {
+  color: var(--fd-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Tighten on small screens */
 @media (max-width: 640px) {
   .fd-module {
