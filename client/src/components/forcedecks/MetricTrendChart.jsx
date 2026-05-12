@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 // Hand-rolled SVG line chart for a single metric across many sessions.
 // Matches the existing Sparkline/HexChart approach (no chart library).
 //
@@ -9,10 +11,15 @@ const WIDTH = 720;
 const HEIGHT = 320;
 const PAD_LEFT = 56;
 const PAD_RIGHT = 16;
-const PAD_TOP = 16;
+const PAD_TOP = 24;
 const PAD_BOTTOM = 36;
 const PLOT_W = WIDTH - PAD_LEFT - PAD_RIGHT;
 const PLOT_H = HEIGHT - PAD_TOP - PAD_BOTTOM;
+
+// Tooltip layout
+const TT_W = 130;
+const TT_H = 44;
+const TT_OFFSET = 14;
 
 function formatTick(value, unit) {
   const abs = Math.abs(value);
@@ -46,6 +53,8 @@ function pickXTickIndices(n) {
 }
 
 export default function MetricTrendChart({ points, unit }) {
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+
   if (!Array.isArray(points) || points.length === 0) {
     return <div className="fd-empty">No data for this metric yet.</div>;
   }
@@ -127,18 +136,81 @@ export default function MetricTrendChart({ points, unit }) {
       {/* Point markers (latest emphasised) */}
       {points.map((p, i) => {
         const isLatest = i === points.length - 1;
+        const isHovered = hoveredIdx === i;
         return (
           <circle
-            key={i}
+            key={`pt-${i}`}
             className={isLatest ? "fd-trend-point fd-trend-point-latest" : "fd-trend-point"}
             cx={xFor(i)}
             cy={yFor(p.value)}
-            r={isLatest ? 5 : 3.5}
-          >
-            <title>{`${formatDateShort(p.testDate)} — ${formatTick(p.value, unit)}`}</title>
-          </circle>
+            r={isHovered ? (isLatest ? 7 : 5.5) : isLatest ? 5 : 3.5}
+          />
         );
       })}
+
+      {/* Wide invisible hit targets so the user doesn't have to be pixel-precise */}
+      {points.map((p, i) => (
+        <circle
+          key={`hit-${i}`}
+          className="fd-trend-hit"
+          cx={xFor(i)}
+          cy={yFor(p.value)}
+          r={14}
+          onMouseEnter={() => setHoveredIdx(i)}
+          onMouseLeave={() => setHoveredIdx((current) => (current === i ? null : current))}
+          onFocus={() => setHoveredIdx(i)}
+          onBlur={() => setHoveredIdx((current) => (current === i ? null : current))}
+          tabIndex={0}
+          role="button"
+          aria-label={`${formatDateShort(p.testDate)} — ${formatTick(p.value, unit)}`}
+        />
+      ))}
+
+      {/* Tooltip — always mounted, animated via opacity/transform */}
+      <Tooltip
+        hoveredIdx={hoveredIdx}
+        points={points}
+        xFor={xFor}
+        yFor={yFor}
+        unit={unit}
+      />
     </svg>
+  );
+}
+
+function Tooltip({ hoveredIdx, points, xFor, yFor, unit }) {
+  // Stay mounted but invisible when no hover so the fade-out animates
+  // on mouse-leave. We persist the last hovered index in render data so
+  // the tooltip content doesn't blank-out mid-fade.
+  const idx = hoveredIdx ?? 0;
+  const p = points[idx];
+  if (!p) return null;
+  const px = xFor(idx);
+  const py = yFor(p.value);
+
+  // Flip below the point when there's not enough room above.
+  const placeAbove = py - TT_OFFSET - TT_H > PAD_TOP;
+  const ttY = placeAbove ? py - TT_OFFSET - TT_H : py + TT_OFFSET;
+
+  // Keep the tooltip inside the plot horizontally.
+  const desiredX = px - TT_W / 2;
+  const minX = PAD_LEFT;
+  const maxX = PAD_LEFT + PLOT_W - TT_W;
+  const ttX = Math.max(minX, Math.min(maxX, desiredX));
+
+  const active = hoveredIdx !== null;
+
+  return (
+    <g transform={`translate(${ttX}, ${ttY})`} pointerEvents="none">
+      <g className={`fd-trend-tooltip ${active ? "is-active" : ""}`} pointerEvents="none">
+        <rect className="fd-trend-tooltip-bg" width={TT_W} height={TT_H} rx={6} ry={6} />
+        <text className="fd-trend-tooltip-date" x={10} y={17}>
+          {formatDateShort(p.testDate)}
+        </text>
+        <text className="fd-trend-tooltip-value" x={10} y={34}>
+          {formatTick(p.value, unit)}
+        </text>
+      </g>
+    </g>
   );
 }

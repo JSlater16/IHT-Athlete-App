@@ -595,6 +595,61 @@ button.fd-metric-card-clickable:focus-visible {
   stroke-width: 2;
 }
 
+.fd-trend-point {
+  transition: r 120ms var(--ease-out, ease-out);
+}
+
+.fd-trend-hit {
+  fill: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.fd-trend-tooltip {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity 110ms var(--ease-out, ease-out);
+  pointer-events: none;
+}
+
+.fd-trend-tooltip.is-active {
+  opacity: 1;
+  animation: fd-trend-tooltip-pop 140ms var(--ease-out, ease-out);
+}
+
+@keyframes fd-trend-tooltip-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fd-trend-tooltip-bg {
+  fill: var(--fd-bg);
+  stroke: var(--fd-accent);
+  stroke-width: 1.25;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+}
+
+.fd-trend-tooltip-date {
+  fill: var(--fd-muted);
+  font-size: 11px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  letter-spacing: 0.02em;
+}
+
+.fd-trend-tooltip-value {
+  fill: var(--fd-fg);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 600px) {
   .fd-trend-header {
     grid-template-columns: 1fr;
