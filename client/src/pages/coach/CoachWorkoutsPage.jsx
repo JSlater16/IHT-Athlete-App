@@ -106,6 +106,7 @@ export default function CoachWorkoutsPage() {
   const [programForm, setProgramForm] = useState(createProgramForm());
   const [programError, setProgramError] = useState("");
   const [programSubmitting, setProgramSubmitting] = useState(false);
+  const [editorView, setEditorView] = useState("days"); // "days" | "blocks"
 
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -191,12 +192,14 @@ export default function CoachWorkoutsPage() {
   function openProgramCreate() {
     setProgramForm(createProgramForm());
     setProgramError("");
+    setEditorView("days");
     setProgramModal({ open: true, mode: "create", programId: null });
   }
 
   function openProgramEdit(program) {
     setProgramForm(programToForm(program));
     setProgramError("");
+    setEditorView("days");
     setProgramModal({ open: true, mode: "edit", programId: program.id });
   }
 
@@ -285,6 +288,16 @@ export default function CoachWorkoutsPage() {
       ...day,
       lifts: day.lifts.filter((_, index) => index !== liftIndex)
     }));
+  }
+
+  function moveProgramLift(dayIndex, liftIndex, direction) {
+    updateProgramDay(dayIndex, (day) => {
+      const target = liftIndex + direction;
+      if (target < 0 || target >= day.lifts.length) return day;
+      const nextLifts = day.lifts.slice();
+      [nextLifts[liftIndex], nextLifts[target]] = [nextLifts[target], nextLifts[liftIndex]];
+      return { ...day, lifts: nextLifts };
+    });
   }
 
   function updateProgramLiftField(dayIndex, liftIndex, field, value) {
@@ -724,152 +737,18 @@ export default function CoachWorkoutsPage() {
                 </label>
               </div>
 
-              <div className="program-builder-stack">
-                {programForm.days.map((day, dayIndex) => (
-                  <section key={`program-day-${dayIndex}`} className="program-builder-card">
-                    <div className="section-heading">
-                      <div>
-                        <p className="eyebrow">Program Day</p>
-                        <h3>Day {dayIndex + 1}</h3>
-                      </div>
-                      <label className="field compact-field">
-                        <span>Week position</span>
-                        <select
-                          value={day.dayOffset}
-                          onChange={(event) =>
-                            updateProgramDay(dayIndex, (currentDay) => ({
-                              ...currentDay,
-                              dayOffset: Number(event.target.value)
-                            }))
-                          }
-                        >
-                          {Array.from({ length: 7 }, (_, index) => (
-                            <option key={index} value={index}>Day {index + 1}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="program-builder-lift-stack">
-                      {day.lifts.map((lift, liftIndex) => {
-                        const matchedLibrary = liftByNormalizedName.get(
-                          normalizeExerciseName(lift.exerciseName)
-                        );
-                        const willCreate = lift.exerciseName.trim() && !matchedLibrary;
-                        return (
-                          <article
-                            key={`day-${dayIndex}-lift-${liftIndex}`}
-                            className="program-builder-lift-card"
-                          >
-                            <div className="lift-editor-grid">
-                              <label className="field">
-                                <span>Exercise</span>
-                                <input
-                                  list={`program-lifts-${dayIndex}-${liftIndex}`}
-                                  value={lift.exerciseName}
-                                  onChange={(event) =>
-                                    updateProgramLiftField(dayIndex, liftIndex, "exerciseName", event.target.value)
-                                  }
-                                  placeholder="Type or select exercise"
-                                  required
-                                />
-                                <datalist id={`program-lifts-${dayIndex}-${liftIndex}`}>
-                                  {(library?.liftLibrary || []).map((libraryLift) => (
-                                    <option key={libraryLift.id} value={libraryLift.name} />
-                                  ))}
-                                </datalist>
-                                {willCreate ? (
-                                  <span className="muted-copy compact-copy program-builder-newlift-hint">
-                                    New library exercise will be created on save.
-                                  </span>
-                                ) : null}
-                              </label>
-
-                              <label className="field">
-                                <span>Where in workout</span>
-                                <select
-                                  value={lift.blockLabel}
-                                  onChange={(event) =>
-                                    updateProgramLiftField(dayIndex, liftIndex, "blockLabel", event.target.value)
-                                  }
-                                >
-                                  {workoutPlacementOptions.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
-                                  ))}
-                                </select>
-                              </label>
-
-                              <label className="field">
-                                <span>Sets</span>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={lift.sets}
-                                  onChange={(event) =>
-                                    updateProgramLiftField(dayIndex, liftIndex, "sets", event.target.value)
-                                  }
-                                  required
-                                />
-                              </label>
-
-                              <label className="field">
-                                <span>Reps</span>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={lift.reps}
-                                  onChange={(event) =>
-                                    updateProgramLiftField(dayIndex, liftIndex, "reps", event.target.value)
-                                  }
-                                  required
-                                />
-                              </label>
-
-                              <label className="field">
-                                <span>Weight</span>
-                                <input
-                                  type="text"
-                                  value={lift.weight}
-                                  onChange={(event) =>
-                                    updateProgramLiftField(dayIndex, liftIndex, "weight", event.target.value)
-                                  }
-                                  required
-                                />
-                              </label>
-
-                              <label className="field field-full">
-                                <span>Notes</span>
-                                <textarea
-                                  rows="3"
-                                  value={lift.notes}
-                                  onChange={(event) =>
-                                    updateProgramLiftField(dayIndex, liftIndex, "notes", event.target.value)
-                                  }
-                                />
-                              </label>
-                            </div>
-
-                            <div className="card-actions">
-                              <button
-                                className="ghost-button"
-                                type="button"
-                                onClick={() => removeProgramLift(dayIndex, liftIndex)}
-                                disabled={day.lifts.length === 1}
-                              >
-                                Remove exercise
-                              </button>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-
-                    <button className="ghost-button" type="button" onClick={() => addProgramLift(dayIndex)}>
-                      Add exercise to day
-                    </button>
-                  </section>
-                ))}
-              </div>
+              <ProgramEditorBody
+                programForm={programForm}
+                editorView={editorView}
+                setEditorView={setEditorView}
+                library={library}
+                liftByNormalizedName={liftByNormalizedName}
+                updateProgramDay={updateProgramDay}
+                updateProgramLiftField={updateProgramLiftField}
+                addProgramLift={addProgramLift}
+                removeProgramLift={removeProgramLift}
+                moveProgramLift={moveProgramLift}
+              />
 
               {programError ? <p className="form-error">{programError}</p> : null}
 
@@ -901,5 +780,339 @@ export default function CoachWorkoutsPage() {
         onCancel={() => setPendingDelete(null)}
       />
     </div>
+  );
+}
+
+// Wraps the day/block toggle and renders whichever view is active.
+// Lift cards are shared via LiftEditorCard so adding new fields only
+// happens in one place.
+function ProgramEditorBody({
+  programForm,
+  editorView,
+  setEditorView,
+  library,
+  liftByNormalizedName,
+  updateProgramDay,
+  updateProgramLiftField,
+  addProgramLift,
+  removeProgramLift,
+  moveProgramLift
+}) {
+  return (
+    <div className="program-builder-stack">
+      <div className="program-builder-view-toggle" role="tablist" aria-label="Program editor view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={editorView === "days"}
+          className={`tab-toggle ${editorView === "days" ? "is-active" : ""}`}
+          onClick={() => setEditorView("days")}
+        >
+          By day
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={editorView === "blocks"}
+          className={`tab-toggle ${editorView === "blocks" ? "is-active" : ""}`}
+          onClick={() => setEditorView("blocks")}
+        >
+          By block
+        </button>
+      </div>
+
+      {editorView === "days" ? (
+        <DaysView
+          programForm={programForm}
+          library={library}
+          liftByNormalizedName={liftByNormalizedName}
+          updateProgramDay={updateProgramDay}
+          updateProgramLiftField={updateProgramLiftField}
+          addProgramLift={addProgramLift}
+          removeProgramLift={removeProgramLift}
+          moveProgramLift={moveProgramLift}
+        />
+      ) : (
+        <BlocksView
+          programForm={programForm}
+          library={library}
+          liftByNormalizedName={liftByNormalizedName}
+          updateProgramLiftField={updateProgramLiftField}
+          removeProgramLift={removeProgramLift}
+          moveProgramLift={moveProgramLift}
+        />
+      )}
+    </div>
+  );
+}
+
+function DaysView({
+  programForm,
+  library,
+  liftByNormalizedName,
+  updateProgramDay,
+  updateProgramLiftField,
+  addProgramLift,
+  removeProgramLift,
+  moveProgramLift
+}) {
+  return (
+    <>
+      {programForm.days.map((day, dayIndex) => (
+        <section key={`program-day-${dayIndex}`} className="program-builder-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Program Day</p>
+              <h3>Day {dayIndex + 1}</h3>
+            </div>
+            <label className="field compact-field">
+              <span>Week position</span>
+              <select
+                value={day.dayOffset}
+                onChange={(event) =>
+                  updateProgramDay(dayIndex, (currentDay) => ({
+                    ...currentDay,
+                    dayOffset: Number(event.target.value)
+                  }))
+                }
+              >
+                {Array.from({ length: 7 }, (_, index) => (
+                  <option key={index} value={index}>Day {index + 1}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="program-builder-lift-stack">
+            {day.lifts.map((lift, liftIndex) => (
+              <LiftEditorCard
+                key={`day-${dayIndex}-lift-${liftIndex}`}
+                lift={lift}
+                dayIndex={dayIndex}
+                liftIndex={liftIndex}
+                liftsInDay={day.lifts.length}
+                library={library}
+                liftByNormalizedName={liftByNormalizedName}
+                updateProgramLiftField={updateProgramLiftField}
+                removeProgramLift={removeProgramLift}
+                moveProgramLift={moveProgramLift}
+              />
+            ))}
+          </div>
+
+          <button className="ghost-button" type="button" onClick={() => addProgramLift(dayIndex)}>
+            Add exercise to day
+          </button>
+        </section>
+      ))}
+    </>
+  );
+}
+
+function BlocksView({
+  programForm,
+  library,
+  liftByNormalizedName,
+  updateProgramLiftField,
+  removeProgramLift,
+  moveProgramLift
+}) {
+  // Group all lifts (across all days) by blockLabel. Each entry keeps
+  // its dayIndex/liftIndex so edit handlers still target the right
+  // slot in the underlying days-array model.
+  const blocks = new Map();
+  for (const placement of workoutPlacementOptions) {
+    blocks.set(placement, []);
+  }
+  programForm.days.forEach((day, dayIndex) => {
+    day.lifts.forEach((lift, liftIndex) => {
+      const label = workoutPlacementOptions.includes(lift.blockLabel) ? lift.blockLabel : "Block 1";
+      blocks.get(label).push({ dayIndex, liftIndex, lift, liftsInDay: day.lifts.length });
+    });
+  });
+  const populatedBlocks = Array.from(blocks.entries()).filter(([, entries]) => entries.length > 0);
+
+  if (populatedBlocks.length === 0) {
+    return <p className="empty-state">No lifts yet. Switch to By day to start adding exercises.</p>;
+  }
+
+  return (
+    <>
+      {populatedBlocks.map(([blockLabel, entries]) => (
+        <section key={`block-${blockLabel}`} className="program-builder-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Block</p>
+              <h3>{blockLabel}</h3>
+            </div>
+            <span className="muted-copy compact-copy">
+              {entries.length} exercise{entries.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="program-builder-lift-stack">
+            {entries.map(({ dayIndex, liftIndex, lift, liftsInDay }) => (
+              <LiftEditorCard
+                key={`block-${blockLabel}-${dayIndex}-${liftIndex}`}
+                lift={lift}
+                dayIndex={dayIndex}
+                liftIndex={liftIndex}
+                liftsInDay={liftsInDay}
+                library={library}
+                liftByNormalizedName={liftByNormalizedName}
+                updateProgramLiftField={updateProgramLiftField}
+                removeProgramLift={removeProgramLift}
+                moveProgramLift={moveProgramLift}
+                dayLabel={`Day ${dayIndex + 1}`}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+      <p className="muted-copy compact-copy">
+        Switch to By day to add new exercises. Reordering and editing work the same in both views.
+      </p>
+    </>
+  );
+}
+
+function LiftEditorCard({
+  lift,
+  dayIndex,
+  liftIndex,
+  liftsInDay,
+  library,
+  liftByNormalizedName,
+  updateProgramLiftField,
+  removeProgramLift,
+  moveProgramLift,
+  dayLabel
+}) {
+  const matchedLibrary = liftByNormalizedName.get(normalizeExerciseName(lift.exerciseName));
+  const willCreate = lift.exerciseName.trim() && !matchedLibrary;
+  const canMoveUp = liftIndex > 0;
+  const canMoveDown = liftIndex < liftsInDay - 1;
+
+  return (
+    <article className="program-builder-lift-card">
+      {dayLabel ? (
+        <div className="program-builder-lift-daytag">
+          <span className="status-badge">{dayLabel}</span>
+        </div>
+      ) : null}
+
+      <div className="lift-editor-grid">
+        <label className="field">
+          <span>Exercise</span>
+          <input
+            list={`program-lifts-${dayIndex}-${liftIndex}`}
+            value={lift.exerciseName}
+            onChange={(event) =>
+              updateProgramLiftField(dayIndex, liftIndex, "exerciseName", event.target.value)
+            }
+            placeholder="Type or select exercise"
+            required
+          />
+          <datalist id={`program-lifts-${dayIndex}-${liftIndex}`}>
+            {(library?.liftLibrary || []).map((libraryLift) => (
+              <option key={libraryLift.id} value={libraryLift.name} />
+            ))}
+          </datalist>
+          {willCreate ? (
+            <span className="muted-copy compact-copy program-builder-newlift-hint">
+              New library exercise will be created on save.
+            </span>
+          ) : null}
+        </label>
+
+        <label className="field">
+          <span>Where in workout</span>
+          <select
+            value={lift.blockLabel}
+            onChange={(event) =>
+              updateProgramLiftField(dayIndex, liftIndex, "blockLabel", event.target.value)
+            }
+          >
+            {workoutPlacementOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>Sets</span>
+          <input
+            type="number"
+            min="1"
+            value={lift.sets}
+            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "sets", event.target.value)}
+            required
+          />
+        </label>
+
+        <label className="field">
+          <span>Reps</span>
+          <input
+            type="number"
+            min="1"
+            value={lift.reps}
+            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "reps", event.target.value)}
+            required
+          />
+        </label>
+
+        <label className="field">
+          <span>Weight</span>
+          <input
+            type="text"
+            value={lift.weight}
+            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "weight", event.target.value)}
+            required
+          />
+        </label>
+
+        <label className="field field-full">
+          <span>Notes</span>
+          <textarea
+            rows="3"
+            value={lift.notes}
+            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "notes", event.target.value)}
+          />
+        </label>
+      </div>
+
+      <div className="card-actions program-builder-lift-actions">
+        <div className="program-builder-lift-order">
+          <button
+            type="button"
+            className="ghost-button icon-button"
+            onClick={() => moveProgramLift(dayIndex, liftIndex, -1)}
+            disabled={!canMoveUp}
+            aria-label="Move exercise up"
+            title="Move up"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="ghost-button icon-button"
+            onClick={() => moveProgramLift(dayIndex, liftIndex, 1)}
+            disabled={!canMoveDown}
+            aria-label="Move exercise down"
+            title="Move down"
+          >
+            ↓
+          </button>
+        </div>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => removeProgramLift(dayIndex, liftIndex)}
+          disabled={liftsInDay === 1}
+        >
+          Remove exercise
+        </button>
+      </div>
+    </article>
   );
 }
