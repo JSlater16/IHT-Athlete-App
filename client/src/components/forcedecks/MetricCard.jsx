@@ -24,10 +24,12 @@ function badgeFor(value, best) {
   return { tone, label: `${sign}${Math.abs(pct).toFixed(1)}% from PR` };
 }
 
-export default function MetricCard({ label, value, unit, sparklineData, best }) {
+export default function MetricCard({ label, value, unit, sparklineData, best, onClick }) {
   const badge = badgeFor(value, best);
-  return (
-    <div className="fd-card fd-metric-card">
+  const interactive = typeof onClick === "function";
+
+  const content = (
+    <>
       <div className="fd-metric-name">{label}</div>
       <div className="fd-metric-row">
         <div>
@@ -41,6 +43,21 @@ export default function MetricCard({ label, value, unit, sparklineData, best }) 
       ) : (
         <div className="fd-badge is-empty">—</div>
       )}
-    </div>
+    </>
+  );
+
+  if (!interactive) {
+    return <div className="fd-card fd-metric-card">{content}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      className="fd-card fd-metric-card fd-metric-card-clickable"
+      onClick={onClick}
+      aria-label={`${label} — view full trend`}
+    >
+      {content}
+    </button>
   );
 }

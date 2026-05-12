@@ -35,6 +35,26 @@
   margin: 0 auto;
 }
 
+.fd-search-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--fd-line-strong);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--fd-fg);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  transition: border-color 160ms var(--ease-out);
+}
+
+.fd-search-input::placeholder {
+  color: var(--fd-muted);
+}
+
+.fd-search-input:focus {
+  outline: none;
+  border-color: var(--fd-accent);
+}
+
 .fd-page-header {
   display: flex;
   justify-content: space-between;
@@ -142,6 +162,29 @@
 .fd-metric-card {
   display: grid;
   gap: 0.6rem;
+}
+
+button.fd-metric-card-clickable {
+  appearance: none;
+  background: var(--fd-bg);
+  border: 1px solid var(--fd-line);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+  width: 100%;
+}
+
+button.fd-metric-card-clickable:hover {
+  border-color: var(--fd-line-strong);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+button.fd-metric-card-clickable:focus-visible {
+  outline: none;
+  border-color: var(--fd-accent);
+  box-shadow: 0 0 0 1px var(--fd-accent);
 }
 
 .fd-metric-name {
@@ -462,6 +505,101 @@
   color: var(--fd-muted);
   text-align: center;
   letter-spacing: 0.02em;
+}
+
+/* Metric trend modal -------------------------------------------- */
+
+.fd-trend-header {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  width: 100%;
+  border-bottom: 1px solid var(--fd-line);
+  padding-bottom: 0.75rem;
+}
+
+.fd-trend-stat {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.fd-trend-stat-label {
+  color: var(--fd-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.fd-trend-stat-value {
+  color: var(--fd-fg);
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.fd-trend-stat-value.is-up {
+  color: var(--fd-accent);
+}
+
+.fd-trend-stat-value.is-down {
+  color: var(--fd-danger);
+}
+
+.fd-trend-stat-value.is-pr {
+  color: var(--fd-accent);
+}
+
+.fd-trend-chart-svg {
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+}
+
+.fd-trend-gridline {
+  stroke: var(--fd-line);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.fd-trend-axis-line {
+  stroke: var(--fd-line-strong);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.fd-trend-axis {
+  fill: var(--fd-muted);
+  font-size: 11px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  letter-spacing: 0.02em;
+}
+
+.fd-trend-line {
+  stroke: var(--fd-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.fd-trend-point {
+  fill: var(--fd-accent);
+  stroke: var(--fd-bg);
+  stroke-width: 1.5;
+}
+
+.fd-trend-point-latest {
+  fill: var(--fd-fg);
+  stroke: var(--fd-accent);
+  stroke-width: 2;
+}
+
+@media (max-width: 600px) {
+  .fd-trend-header {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
 }
 
 .fd-report-spinner {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
@@ -19,6 +19,7 @@ export default function AthleteRoster() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [state, setState] = useState({ status: "loading", athletes: [], error: null });
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -33,6 +34,12 @@ export default function AthleteRoster() {
     return () => ctrl.abort();
   }, [token]);
 
+  const filteredAthletes = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return state.athletes;
+    return state.athletes.filter((a) => (a.name || "").toLowerCase().includes(needle));
+  }, [state.athletes, query]);
+
   return (
     <div className="fd-module">
       <div className="fd-page">
@@ -46,12 +53,25 @@ export default function AthleteRoster() {
           </div>
         </header>
 
+        {state.status === "ready" && state.athletes.length > 0 ? (
+          <input
+            type="search"
+            className="fd-search-input"
+            placeholder="Search athletes…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Filter athletes by name"
+          />
+        ) : null}
+
         {state.status === "loading" ? (
           <div className="fd-empty">Loading roster…</div>
         ) : state.status === "error" ? (
           <div className="fd-empty fd-empty-error">{state.error}</div>
         ) : state.athletes.length === 0 ? (
           <div className="fd-empty">No active athletes.</div>
+        ) : filteredAthletes.length === 0 ? (
+          <div className="fd-empty">No athletes match “{query}”.</div>
         ) : (
           <table className="fd-roster-table">
             <thead>
@@ -64,7 +84,7 @@ export default function AthleteRoster() {
               </tr>
             </thead>
             <tbody>
-              {state.athletes.map((a) => (
+              {filteredAthletes.map((a) => (
                 <tr
                   key={a.athleteId}
                   className={a.flagged ? "fd-roster-row fd-row-flagged" : "fd-roster-row"}

@@ -3,6 +3,7 @@ import { apiRequest } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import ReadinessRing from "./ReadinessRing";
 import MetricCard from "./MetricCard";
+import MetricTrendModal from "./MetricTrendModal";
 
 // Build a sparkline value array for one metric across the returned
 // tests. Tests come back newest-first from the API; the sparkline
@@ -18,6 +19,7 @@ function sparklineForMetric(tests, key) {
 export default function ForcedecksDashboard({ scope, athleteId, headerSlot }) {
   const { token, user } = useAuth();
   const [state, setState] = useState({ status: "loading", data: null, error: null });
+  const [openMetric, setOpenMetric] = useState(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -51,14 +53,28 @@ export default function ForcedecksDashboard({ scope, athleteId, headerSlot }) {
         ) : !state.data || !state.data.tests || state.data.tests.length === 0 ? (
           <div className="fd-empty">No ForceDecks tests yet for this athlete.</div>
         ) : (
-          <Body data={state.data} includeCoachMetrics={includeCoachMetrics} />
+          <Body
+            data={state.data}
+            includeCoachMetrics={includeCoachMetrics}
+            onSelectMetric={setOpenMetric}
+          />
         )}
       </div>
+
+      <MetricTrendModal
+        open={Boolean(openMetric)}
+        scope={scope}
+        athleteId={athleteId}
+        metricKey={openMetric?.key || null}
+        metricLabel={openMetric?.label || ""}
+        unit={openMetric?.unit || ""}
+        onClose={() => setOpenMetric(null)}
+      />
     </div>
   );
 }
 
-function Body({ data, includeCoachMetrics }) {
+function Body({ data, includeCoachMetrics, onSelectMetric }) {
   const latest = data.tests[0];
   const metrics = (data.metricCatalog || []).filter((m) =>
     includeCoachMetrics ? true : !m.coachOnly
@@ -88,6 +104,7 @@ function Body({ data, includeCoachMetrics }) {
               unit={unit}
               sparklineData={sparklineForMetric(data.tests, m.key)}
               best={data.bests?.[m.key] ?? null}
+              onClick={() => onSelectMetric({ key: m.key, label: m.label, unit })}
             />
           );
         })}

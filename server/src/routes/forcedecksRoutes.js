@@ -12,7 +12,7 @@ const router = express.Router();
 const LEADERBOARD_METRIC_KEYS = METRICS.filter((m) => !m.coachOnly).map((m) => m.key);
 
 const DEFAULT_LIMIT = 3;
-const MAX_LIMIT = 20;
+const MAX_LIMIT = 60;
 
 function parseLimit(value) {
   const parsed = Number(value);
