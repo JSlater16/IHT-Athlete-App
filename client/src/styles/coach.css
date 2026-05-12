@@ -340,6 +340,96 @@
   margin-bottom: 1rem;
 }
 
+/* VALD profile picker -------------------------------------------- */
+
+.vald-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.vald-link-status {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.vald-link-id {
+  color: var(--text-soft);
+  font-weight: 400;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.85rem;
+}
+
+.vald-picker-panel {
+  margin-top: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0.85rem;
+  background: var(--surface-translucent);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.vald-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.vald-picker-search {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.vald-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.vald-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.vald-picker-row-name {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.vald-picker-row-name strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.vald-picker-row-dob,
+.vald-picker-row-linked {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.vald-picker-row-linked {
+  color: #c0392b;
+}
+
 /* Rehab notes + rehab editor ------------------------------------- */
 
 .rehab-note-card span {

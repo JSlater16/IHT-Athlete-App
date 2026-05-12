@@ -33,6 +33,41 @@ const maxMuscleSuggestions = 8;
 const maxPadPlacementImages = 8;
 const workoutPlacementOptions = ["Prep", "Block 1", "Block 2", "Block 3", "Block 4"];
 
+function normalizeName(value) {
+  return (value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function scoreValdProfileForAthlete(profile, athleteName) {
+  const athleteTokens = new Set(normalizeName(athleteName));
+  if (athleteTokens.size === 0) return 0;
+  const profileTokens = new Set([
+    ...normalizeName(profile.givenName),
+    ...normalizeName(profile.familyName)
+  ]);
+  let overlap = 0;
+  for (const t of athleteTokens) if (profileTokens.has(t)) overlap += 1;
+  // Bonus for full-name exact match.
+  if (overlap === athleteTokens.size && overlap === profileTokens.size) overlap += 1;
+  return overlap;
+}
+
+function rankValdProfiles(profiles, athleteName, query) {
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? profiles.filter((p) => `${p.givenName} ${p.familyName}`.toLowerCase().includes(q))
+    : profiles;
+  return filtered
+    .map((p) => ({ ...p, _score: scoreValdProfileForAthlete(p, athleteName) }))
+    .sort((a, b) => {
+      if (b._score !== a._score) return b._score - a._score;
+      return `${a.familyName} ${a.givenName}`.localeCompare(`${b.familyName} ${b.givenName}`);
+    });
+}
+
 function createManualLiftForm(selectedDateKey = "") {
   return {
     exerciseName: "",
@@ -244,6 +279,7 @@ export default function CoachAthleteProfilePage() {
   const [activeMuscleFieldId, setActiveMuscleFieldId] = useState("");
   const [activeMuscleSuggestionIndex, setActiveMuscleSuggestionIndex] = useState(-1);
   const [statusMessage, setStatusMessage] = useState("");
+  const [valdPicker, setValdPicker] = useState({ open: false, loading: false, error: "", profiles: [], query: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const statusTimerRef = useRef(null);
@@ -447,6 +483,45 @@ export default function CoachAthleteProfilePage() {
       showStatus("Overview updated.");
     } catch (saveError) {
       setError(saveError.message);
+    }
+  }
+
+  async function openValdPicker() {
+    setValdPicker((current) => ({ ...current, open: true, loading: true, error: "", query: "" }));
+    try {
+      const data = await apiRequest("/api/vald/profiles", { token });
+      setValdPicker((current) => ({
+        ...current,
+        loading: false,
+        profiles: data?.profiles || []
+      }));
+    } catch (err) {
+      setValdPicker((current) => ({
+        ...current,
+        loading: false,
+        error: err.message || "Failed to load VALD profiles"
+      }));
+    }
+  }
+
+  function closeValdPicker() {
+    setValdPicker({ open: false, loading: false, error: "", profiles: [], query: "" });
+  }
+
+  async function handleLinkValdProfile(valdProfileId) {
+    setError("");
+    try {
+      const data = await apiRequest(`/api/athletes/${athleteId}/vald-profile`, {
+        method: "PUT",
+        token,
+        body: { valdProfileId }
+      });
+      setProfile(data.athlete);
+      setOverviewForm((current) => ({ ...current, valdProfileId: data.athlete.valdProfileId || "" }));
+      showStatus(valdProfileId ? "Linked to VALD profile." : "Unlinked from VALD profile.");
+      closeValdPicker();
+    } catch (linkError) {
+      setError(linkError.message);
     }
   }
 
@@ -998,20 +1073,45 @@ export default function CoachAthleteProfilePage() {
                   />
                 </label>
 
-                <label className="field">
-                  <span>VALD profile ID</span>
-                  <input
-                    type="text"
-                    placeholder="e.g. a3b2c1d0-4e5f-6789-abcd-ef0123456789"
-                    value={overviewForm.valdProfileId}
-                    onChange={(event) =>
-                      setOverviewForm((current) => ({ ...current, valdProfileId: event.target.value }))
-                    }
-                  />
+                <div className="field">
+                  <span>VALD Hub profile</span>
+                  {profile?.valdProfileId ? (
+                    <div className="vald-link-row">
+                      <span className="vald-link-status">
+                        Linked
+                        <span className="vald-link-id"> ({profile.valdProfileId.slice(0, 8)}…)</span>
+                      </span>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => handleLinkValdProfile(null)}
+                      >
+                        Unlink
+                      </button>
+                      <button className="ghost-button" type="button" onClick={openValdPicker}>
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="ghost-button" type="button" onClick={openValdPicker}>
+                      Pick VALD profile
+                    </button>
+                  )}
                   <span className="muted-copy compact-copy">
-                    Paste the athlete's VALD Hub profile UUID to link their ForceDecks data. Leave blank to unlink.
+                    Links this athlete to their VALD Hub profile so ForceDecks data syncs automatically.
                   </span>
-                </label>
+
+                  {valdPicker.open ? (
+                    <ValdPickerPanel
+                      picker={valdPicker}
+                      athleteName={profile?.name || ""}
+                      currentValdProfileId={profile?.valdProfileId || null}
+                      onClose={closeValdPicker}
+                      onSelect={handleLinkValdProfile}
+                      onQueryChange={(query) => setValdPicker((current) => ({ ...current, query }))}
+                    />
+                  ) : null}
+                </div>
 
                 <button className="primary-button desktop-button" type="submit">
                   Save overview
@@ -1778,6 +1878,72 @@ export default function CoachAthleteProfilePage() {
           ) : null}
         </>
       ) : null}
+    </div>
+  );
+}
+
+function ValdPickerPanel({ picker, athleteName, currentValdProfileId, onClose, onSelect, onQueryChange }) {
+  const ranked = rankValdProfiles(picker.profiles, athleteName, picker.query);
+
+  return (
+    <div className="vald-picker-panel">
+      <div className="vald-picker-header">
+        <strong>Pick a VALD profile</strong>
+        <button className="ghost-button" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <input
+        type="search"
+        className="vald-picker-search"
+        placeholder="Search by name"
+        value={picker.query}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
+      {picker.loading ? (
+        <p className="muted-copy compact-copy">Loading profiles…</p>
+      ) : picker.error ? (
+        <p className="form-error">{picker.error}</p>
+      ) : ranked.length === 0 ? (
+        <p className="muted-copy compact-copy">No matching VALD profiles.</p>
+      ) : (
+        <ul className="vald-picker-list">
+          {ranked.map((profile) => {
+            const linkedElsewhere =
+              profile.linkedAthlete && profile.profileId !== currentValdProfileId;
+            const isCurrent = profile.profileId === currentValdProfileId;
+            return (
+              <li key={profile.profileId} className="vald-picker-row">
+                <div className="vald-picker-row-name">
+                  <strong>
+                    {profile.givenName || profile.familyName
+                      ? `${profile.givenName} ${profile.familyName}`.trim()
+                      : "(no name)"}
+                  </strong>
+                  {profile.dateOfBirth ? (
+                    <span className="vald-picker-row-dob">
+                      DOB {new Date(profile.dateOfBirth).toLocaleDateString()}
+                    </span>
+                  ) : null}
+                  {linkedElsewhere ? (
+                    <span className="vald-picker-row-linked">
+                      Linked to {profile.linkedAthlete.name}
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className={isCurrent ? "ghost-button" : "primary-button"}
+                  disabled={linkedElsewhere || isCurrent}
+                  onClick={() => onSelect(profile.profileId)}
+                >
+                  {isCurrent ? "Current" : linkedElsewhere ? "Taken" : "Link"}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

@@ -692,6 +692,47 @@ router.put("/:id/rehab/:noteId", async (req, res, next) => {
   }
 });
 
+router.put("/:id/vald-profile", async (req, res, next) => {
+  try {
+    const athlete = await getAthleteProfileOr404(req.params.id, res);
+    if (!athlete) {
+      return;
+    }
+
+    const raw = req.body?.valdProfileId;
+    let valdProfileId;
+    if (raw === null || raw === "" || raw === undefined) {
+      valdProfileId = null;
+    } else if (typeof raw === "string" && uuidPattern.test(raw.trim())) {
+      valdProfileId = raw.trim().toLowerCase();
+    } else {
+      return res.status(400).json({ error: "valdProfileId must be a UUID or null." });
+    }
+
+    const updated = await prisma.athleteProfile.update({
+      where: { id: athlete.id },
+      data: { valdProfileId },
+      include: { user: true }
+    });
+
+    await recordAudit({
+      req,
+      action: "athlete.vald_profile.update",
+      targetType: "athlete",
+      targetId: athlete.id,
+      targetLabel: athlete.user.email,
+      metadata: { valdProfileId }
+    });
+
+    return res.json({ athlete: serializeAthleteProfile(updated) });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return res.status(400).json({ error: "That VALD profile is already linked to another athlete." });
+    }
+    return next(error);
+  }
+});
+
 router.put("/:id/leaderboard-visibility", async (req, res, next) => {
   try {
     const athlete = await getAthleteProfileOr404(req.params.id, res);

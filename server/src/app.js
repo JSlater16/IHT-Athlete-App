@@ -13,6 +13,7 @@ const programLibraryRoutes = require("./routes/programLibraryRoutes");
 const staffRoutes = require("./routes/staffRoutes");
 const auditRoutes = require("./routes/auditRoutes");
 const forcedecksRoutes = require("./routes/forcedecksRoutes");
+const valdRoutes = require("./routes/valdRoutes");
 const { requireAuth, requireAthlete, requireCoach, requireOwner } = require("./middleware/auth");
 
 const app = express();
@@ -84,6 +85,7 @@ app.use("/api/me", requireAuth, requireAthlete, meRoutes);
 /* forcedecksRoutes does its own per-route role gating (athlete-self
    vs coach-roster vs coach-ingest) so we only require auth here. */
 app.use("/api/forcedecks", requireAuth, forcedecksRoutes);
+app.use("/api/vald", requireAuth, requireCoach, valdRoutes);
 
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
