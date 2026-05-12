@@ -11,6 +11,8 @@ const router = express.Router();
 // (W/kg, RFD, etc) don't leak into the peer leaderboard.
 const LEADERBOARD_METRIC_KEYS = METRICS.filter((m) => !m.coachOnly).map((m) => m.key);
 
+const LEADERBOARD_TOP_N = 10;
+
 const DEFAULT_LIMIT = 3;
 const MAX_LIMIT = 60;
 
@@ -71,6 +73,12 @@ async function loadAthleteDashboard(athleteId, limit) {
 // when the caller is an athlete so the UI can highlight their row.
 router.get("/leaderboard", async (req, res, next) => {
   try {
+    // Coaches/owners can request the full board via ?full=1; athletes
+    // are always capped to the top N regardless of what they send.
+    const isCoachLike = req.user?.role === "COACH" || req.user?.role === "OWNER";
+    const requestFull = req.query.full === "1" && isCoachLike;
+    const capPerBoard = requestFull ? Infinity : LEADERBOARD_TOP_N;
+
     const eligible = await prisma.athleteProfile.findMany({
       where: {
         hideFromLeaderboard: false,
@@ -108,7 +116,7 @@ router.get("/leaderboard", async (req, res, next) => {
       });
 
       // Dedupe to one entry per athlete (the highest, which comes first
-      // because the query is value-desc).
+      // because the query is value-desc), then cap at the top N.
       const seen = new Set();
       const ranked = [];
       for (const row of topRows) {
@@ -122,6 +130,7 @@ router.get("/leaderboard", async (req, res, next) => {
           unit: row.unit || metricDef?.unit || "",
           testDate: row.test.testDate
         });
+        if (ranked.length >= capPerBoard) break;
       }
 
       boards.push({

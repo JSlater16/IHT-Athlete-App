@@ -28,7 +28,7 @@ export default function CoachLeaderboardPage() {
     setBoardsState({ status: "loading", data: null, error: null });
     try {
       const [boardsData, athletesData] = await Promise.all([
-        apiRequest("/api/forcedecks/leaderboard", { token, signal }),
+        apiRequest("/api/forcedecks/leaderboard?full=1", { token, signal }),
         apiRequest("/api/athletes", { token, signal })
       ]);
       setBoardsState({ status: "ready", data: boardsData, error: null });
@@ -122,7 +122,13 @@ export default function CoachLeaderboardPage() {
   );
 }
 
+const DEFAULT_VISIBLE = 10;
+
 function Board({ board }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleRows = expanded ? board.rows : board.rows.slice(0, DEFAULT_VISIBLE);
+  const hiddenCount = board.rows.length - DEFAULT_VISIBLE;
+
   return (
     <section className="lb-board">
       <header className="lb-board-header">
@@ -133,22 +139,33 @@ function Board({ board }) {
       {board.rows.length === 0 ? (
         <div className="fd-empty">No qualifying tests yet.</div>
       ) : (
-        <ol className="lb-row-list">
-          {board.rows.map((row, idx) => {
-            const rank = idx + 1;
-            const rankClass = rank === 1 ? "lb-rank-1" : rank === 2 ? "lb-rank-2" : rank === 3 ? "lb-rank-3" : "";
-            return (
-              <li key={row.athleteId} className="lb-row">
-                <span className={`lb-row-rank ${rankClass}`}>{rank}</span>
-                <div className="lb-row-name">
-                  <strong>{row.name}</strong>
-                  <span className="lb-row-date">{formatDate(row.testDate)}</span>
-                </div>
-                <span className="lb-row-value">{formatValue(row.value, row.unit)}</span>
-              </li>
-            );
-          })}
-        </ol>
+        <>
+          <ol className="lb-row-list">
+            {visibleRows.map((row, idx) => {
+              const rank = idx + 1;
+              const rankClass = rank === 1 ? "lb-rank-1" : rank === 2 ? "lb-rank-2" : rank === 3 ? "lb-rank-3" : "";
+              return (
+                <li key={row.athleteId} className="lb-row">
+                  <span className={`lb-row-rank ${rankClass}`}>{rank}</span>
+                  <div className="lb-row-name">
+                    <strong>{row.name}</strong>
+                    <span className="lb-row-date">{formatDate(row.testDate)}</span>
+                  </div>
+                  <span className="lb-row-value">{formatValue(row.value, row.unit)}</span>
+                </li>
+              );
+            })}
+          </ol>
+          {hiddenCount > 0 ? (
+            <button
+              type="button"
+              className="ghost-button lb-show-more"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? "Show top 10" : `Show all (${board.rows.length})`}
+            </button>
+          ) : null}
+        </>
       )}
     </section>
   );

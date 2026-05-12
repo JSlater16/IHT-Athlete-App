@@ -838,3 +838,11 @@ button.fd-metric-card-clickable:focus-visible {
   font-variant-numeric: tabular-nums;
   font-size: 0.95rem;
 }
+
+.lb-show-more {
+  margin-top: 0.5rem;
+  align-self: start;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
