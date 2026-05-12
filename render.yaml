@@ -35,3 +35,11 @@ services:
         value: david@ihthumanperformance.com
       - key: OWNER_PASSWORD
         sync: false
+      - key: VALD_REGION
+        value: use
+      - key: VALD_TENANT_ID
+        value: d05c0921-fc39-4d63-a706-0f69dc754103
+      - key: VALD_CLIENT_ID
+        sync: false
+      - key: VALD_CLIENT_SECRET
+        sync: false
