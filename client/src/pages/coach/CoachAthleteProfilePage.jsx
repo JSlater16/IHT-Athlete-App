@@ -217,7 +217,8 @@ export default function CoachAthleteProfilePage() {
     coachNotes: "",
     programmingDays: 3,
     trainingModel: "",
-    programVariant: standardProgramVariant
+    programVariant: standardProgramVariant,
+    valdProfileId: ""
   });
   const [library, setLibrary] = useState(null);
   const [librarySummary, setLibrarySummary] = useState({
@@ -369,7 +370,8 @@ export default function CoachAthleteProfilePage() {
           coachNotes: profileData?.athlete?.coachNotes || "",
           programmingDays: profileData?.athlete?.programmingDays || 3,
           trainingModel: profileData?.athlete?.trainingModel || "",
-          programVariant: profileData?.athlete?.programVariant || standardProgramVariant
+          programVariant: profileData?.athlete?.programVariant || standardProgramVariant,
+          valdProfileId: profileData?.athlete?.valdProfileId || ""
         });
         setRehabProfileForm(normalizeRehabProfileForm(profileData?.athlete?.rehabProfile));
         setWeeklyLifts(liftsData?.lifts || []);
@@ -429,7 +431,8 @@ export default function CoachAthleteProfilePage() {
           coachNotes: overviewForm.coachNotes,
           trainingModel: overviewForm.trainingModel,
           programVariant: overviewForm.programVariant,
-          programmingDays: Number(overviewForm.programmingDays)
+          programmingDays: Number(overviewForm.programmingDays),
+          valdProfileId: overviewForm.valdProfileId.trim() || null
         }
       });
       setProfile(data.athlete);
@@ -438,7 +441,8 @@ export default function CoachAthleteProfilePage() {
         coachNotes: data.athlete.coachNotes,
         trainingModel: data.athlete.trainingModel,
         programVariant: data.athlete.programVariant,
-        programmingDays: data.athlete.programmingDays
+        programmingDays: data.athlete.programmingDays,
+        valdProfileId: data.athlete.valdProfileId || ""
       });
       showStatus("Overview updated.");
     } catch (saveError) {
@@ -992,6 +996,21 @@ export default function CoachAthleteProfilePage() {
                       setOverviewForm((current) => ({ ...current, coachNotes: event.target.value }))
                     }
                   />
+                </label>
+
+                <label className="field">
+                  <span>VALD profile ID</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. a3b2c1d0-4e5f-6789-abcd-ef0123456789"
+                    value={overviewForm.valdProfileId}
+                    onChange={(event) =>
+                      setOverviewForm((current) => ({ ...current, valdProfileId: event.target.value }))
+                    }
+                  />
+                  <span className="muted-copy compact-copy">
+                    Paste the athlete's VALD Hub profile UUID to link their ForceDecks data. Leave blank to unlink.
+                  </span>
                 </label>
 
                 <button className="primary-button desktop-button" type="submit">

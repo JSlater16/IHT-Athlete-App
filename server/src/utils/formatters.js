@@ -34,6 +34,7 @@ function serializeAthleteProfile(profile) {
     rehabProfile: parseRehabProfile(profile.rehabProfile),
     coachNotes: profile.coachNotes,
     hideFromLeaderboard: Boolean(profile.hideFromLeaderboard),
+    valdProfileId: profile.valdProfileId || null,
     updatedAt: profile.updatedAt
   };
 }

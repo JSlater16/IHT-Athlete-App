@@ -24,6 +24,7 @@ const router = express.Router();
 const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"]);
 const allowedModels = new Set(["10-Week", "20-Week"]);
 const allowedFrequencies = new Set([3, 4, 5]);
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getPrepProgramNames(library) {
   return [...new Set((library?.programs || []).filter((program) => program.phase === "Prep").map((program) => program.name))]
@@ -303,6 +304,22 @@ router.put("/:id", async (req, res, next) => {
     const coachNotes =
       typeof req.body?.coachNotes === "string" ? req.body.coachNotes.trim() : null;
 
+    // valdProfileId is optional; "" / null both mean "unlink from VALD".
+    // We pull it conditionally so existing PUT callers that don't send
+    // the field keep their current value.
+    const hasValdProfileIdInBody = Object.prototype.hasOwnProperty.call(req.body || {}, "valdProfileId");
+    let valdProfileIdInput = athlete.valdProfileId;
+    if (hasValdProfileIdInBody) {
+      const raw = req.body.valdProfileId;
+      if (raw === null || raw === "") {
+        valdProfileIdInput = null;
+      } else if (typeof raw === "string" && uuidPattern.test(raw.trim())) {
+        valdProfileIdInput = raw.trim().toLowerCase();
+      } else {
+        return res.status(400).json({ error: "valdProfileId must be a UUID or null." });
+      }
+    }
+
     if (!phase) {
       return res.status(400).json({ error: "Phase is required." });
     }
@@ -345,7 +362,8 @@ router.put("/:id", async (req, res, next) => {
         trainingModel,
         programVariant,
         programmingDays,
-        coachNotes: coachNotes ?? athlete.coachNotes
+        coachNotes: coachNotes ?? athlete.coachNotes,
+        valdProfileId: valdProfileIdInput
       },
       include: { user: true }
     });
@@ -360,6 +378,7 @@ router.put("/:id", async (req, res, next) => {
     if (programVariant !== athlete.programVariant) changedFields.push("programVariant");
     if (programmingDays !== athlete.programmingDays) changedFields.push("programmingDays");
     if (coachNotes !== null && coachNotes !== athlete.coachNotes) changedFields.push("coachNotes");
+    if (hasValdProfileIdInBody && valdProfileIdInput !== athlete.valdProfileId) changedFields.push("valdProfileId");
 
     await recordAudit({
       req,
@@ -372,6 +391,9 @@ router.put("/:id", async (req, res, next) => {
 
     return res.json({ athlete: serializeAthleteProfile(updated) });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return res.status(400).json({ error: "That VALD profile is already linked to another athlete." });
+    }
     return next(error);
   }
 });
