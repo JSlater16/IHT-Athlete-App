@@ -8,6 +8,7 @@ import AthleteHomePage from "./pages/athlete/AthleteHomePage";
 import AthleteHistoryPage from "./pages/athlete/AthleteHistoryPage";
 import AthleteProfilePage from "./pages/athlete/AthleteProfilePage";
 import AthleteForceDecksPage from "./pages/athlete/AthleteForceDecksPage";
+import AthleteLeaderboardPage from "./pages/athlete/AthleteLeaderboardPage";
 import CoachRosterPage from "./pages/coach/CoachRosterPage";
 import CoachAthleteProfilePage from "./pages/coach/CoachAthleteProfilePage";
 import CoachWorkoutsPage from "./pages/coach/CoachWorkoutsPage";
@@ -16,6 +17,7 @@ import CoachStaffPage from "./pages/coach/CoachStaffPage";
 import CoachAuditPage from "./pages/coach/CoachAuditPage";
 import CoachForceDecksRosterPage from "./pages/coach/CoachForceDecksRosterPage";
 import CoachForceDecksAthletePage from "./pages/coach/CoachForceDecksAthletePage";
+import CoachLeaderboardPage from "./pages/coach/CoachLeaderboardPage";
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -60,6 +62,7 @@ export default function App() {
         <Route path="home" element={<AthleteHomePage />} />
         <Route path="history" element={<AthleteHistoryPage />} />
         <Route path="forcedecks" element={<AthleteForceDecksPage />} />
+        <Route path="leaderboard" element={<AthleteLeaderboardPage />} />
         <Route path="profile" element={<AthleteProfilePage />} />
       </Route>
 
@@ -79,6 +82,7 @@ export default function App() {
         <Route path="amit" element={<CoachAmitPage />} />
         <Route path="forcedecks" element={<CoachForceDecksRosterPage />} />
         <Route path="forcedecks/:athleteId" element={<CoachForceDecksAthletePage />} />
+        <Route path="leaderboard" element={<CoachLeaderboardPage />} />
         <Route
           path="staff"
           element={

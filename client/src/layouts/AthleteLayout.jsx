@@ -1,11 +1,18 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { HomeIcon, HistoryIcon, ProfileIcon, ForceDecksIcon } from "../components/icons";
+import {
+  HomeIcon,
+  HistoryIcon,
+  ProfileIcon,
+  ForceDecksIcon,
+  LeaderboardIcon
+} from "../components/icons";
 
 const tabs = [
   { to: "/athlete/home", label: "Home", Icon: HomeIcon },
   { to: "/athlete/history", label: "History", Icon: HistoryIcon },
   { to: "/athlete/forcedecks", label: "ForceDecks", Icon: ForceDecksIcon },
+  { to: "/athlete/leaderboard", label: "Boards", Icon: LeaderboardIcon },
   { to: "/athlete/profile", label: "Profile", Icon: ProfileIcon }
 ];
 

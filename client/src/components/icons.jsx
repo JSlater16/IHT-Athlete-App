@@ -107,6 +107,18 @@ export function AuditIcon(props) {
   );
 }
 
+export function LeaderboardIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M7 4h10v4a5 5 0 0 1-10 0V4z" />
+      <path d="M4.5 5.5h2.5V8a2.5 2.5 0 0 1-2.5-2.5z" />
+      <path d="M19.5 5.5H17V8a2.5 2.5 0 0 0 2.5-2.5z" />
+      <path d="M9 13.5h6l-.5 3.5h-5z" />
+      <path d="M7 20h10" />
+    </Icon>
+  );
+}
+
 /* ForceDecks — stylized vertical bars (force plates / jump data).
    Reads as "performance" without leaning on a literal jump arc. */
 export function ForceDecksIcon(props) {

@@ -29,16 +29,17 @@ model User {
 }
 
 model AthleteProfile {
-  id              String           @id @default(cuid())
-  userId          String           @unique
-  phase           String
-  phaseStartedAt  DateTime         @default(now())
-  coachNotes      String           @default("")
-  rehabProfile    String           @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
-  programmingDays Int              @default(3)
-  trainingModel   String           @default("10-Week")
-  programVariant  String           @default("Standard")
-  updatedAt       DateTime         @updatedAt
+  id                      String           @id @default(cuid())
+  userId                  String           @unique
+  phase                   String
+  phaseStartedAt          DateTime         @default(now())
+  coachNotes              String           @default("")
+  rehabProfile            String           @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
+  programmingDays         Int              @default(3)
+  trainingModel           String           @default("10-Week")
+  programVariant          String           @default("Standard")
+  hideFromLeaderboard     Boolean          @default(false)
+  updatedAt               DateTime         @updatedAt
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   lifts           Lift[]
   rehabNotes      RehabNote[]

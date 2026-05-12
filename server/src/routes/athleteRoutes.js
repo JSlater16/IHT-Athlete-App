@@ -670,6 +670,38 @@ router.put("/:id/rehab/:noteId", async (req, res, next) => {
   }
 });
 
+router.put("/:id/leaderboard-visibility", async (req, res, next) => {
+  try {
+    const athlete = await getAthleteProfileOr404(req.params.id, res);
+    if (!athlete) {
+      return;
+    }
+
+    if (typeof req.body?.hideFromLeaderboard !== "boolean") {
+      return res.status(400).json({ error: "hideFromLeaderboard must be a boolean." });
+    }
+
+    const updated = await prisma.athleteProfile.update({
+      where: { id: athlete.id },
+      data: { hideFromLeaderboard: req.body.hideFromLeaderboard },
+      include: { user: true }
+    });
+
+    await recordAudit({
+      req,
+      action: "athlete.leaderboard_visibility.update",
+      targetType: "athlete",
+      targetId: athlete.id,
+      targetLabel: athlete.user.email,
+      metadata: { hideFromLeaderboard: req.body.hideFromLeaderboard }
+    });
+
+    return res.json({ athlete: serializeAthleteProfile(updated) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.put("/:id/rehab-profile", async (req, res, next) => {
   try {
     const athlete = await getAthleteProfileOr404(req.params.id, res);

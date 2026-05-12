@@ -446,6 +446,21 @@ export default function CoachAthleteProfilePage() {
     }
   }
 
+  async function handleToggleLeaderboardVisibility(nextHidden) {
+    setError("");
+    try {
+      const data = await apiRequest(`/api/athletes/${athleteId}/leaderboard-visibility`, {
+        method: "PUT",
+        token,
+        body: { hideFromLeaderboard: nextHidden }
+      });
+      setProfile(data.athlete);
+      showStatus(nextHidden ? "Removed from leaderboard." : "Added to leaderboard.");
+    } catch (toggleError) {
+      setError(toggleError.message);
+    }
+  }
+
   async function handleUpdateLift(lift) {
     setError("");
 
@@ -983,6 +998,22 @@ export default function CoachAthleteProfilePage() {
                   Save overview
                 </button>
               </form>
+
+              <div className="template-match-card">
+                <strong>Leaderboard</strong>
+                <p className="muted-copy compact-copy">
+                  {profile?.hideFromLeaderboard
+                    ? "Currently hidden from the athlete leaderboard."
+                    : "Currently shown on the athlete leaderboard for jump height and peak power."}
+                </p>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => handleToggleLeaderboardVisibility(!profile?.hideFromLeaderboard)}
+                >
+                  {profile?.hideFromLeaderboard ? "Show on leaderboard" : "Hide from leaderboard"}
+                </button>
+              </div>
 
               <div className="template-match-card">
                 <strong>Phase progression</strong>

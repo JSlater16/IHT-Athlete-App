@@ -1,6 +1,14 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { AthletesIcon, WorkoutsIcon, AmitIcon, StaffIcon, AuditIcon, ForceDecksIcon } from "../components/icons";
+import {
+  AthletesIcon,
+  WorkoutsIcon,
+  AmitIcon,
+  StaffIcon,
+  AuditIcon,
+  ForceDecksIcon,
+  LeaderboardIcon
+} from "../components/icons";
 import InstallAppButton from "../components/InstallAppButton";
 
 export default function CoachLayout() {
@@ -36,6 +44,10 @@ export default function CoachLayout() {
           <NavLink to="/dashboard/forcedecks" className={({ isActive }) => sidebarLinkClass(isActive)}>
             <ForceDecksIcon className="sidebar-icon" />
             <span>ForceDecks</span>
+          </NavLink>
+          <NavLink to="/dashboard/leaderboard" className={({ isActive }) => sidebarLinkClass(isActive)}>
+            <LeaderboardIcon className="sidebar-icon" />
+            <span>Leaderboards</span>
           </NavLink>
           {user?.role === "OWNER" ? (
             <>

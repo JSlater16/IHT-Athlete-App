@@ -33,6 +33,7 @@ function serializeAthleteProfile(profile) {
     programVariant: profile.programVariant || standardProgramVariant,
     rehabProfile: parseRehabProfile(profile.rehabProfile),
     coachNotes: profile.coachNotes,
+    hideFromLeaderboard: Boolean(profile.hideFromLeaderboard),
     updatedAt: profile.updatedAt
   };
 }

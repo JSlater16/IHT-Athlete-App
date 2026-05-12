@@ -6,6 +6,11 @@ const { METRICS, isValidMetricKey } = require("../utils/forcedecks");
 
 const router = express.Router();
 
+// Metrics that appear on the athlete-facing leaderboard. Pulled from
+// the public (non-coachOnly) metric catalog so coach-only metrics
+// (W/kg, RFD, etc) don't leak into the peer leaderboard.
+const LEADERBOARD_METRIC_KEYS = METRICS.filter((m) => !m.coachOnly).map((m) => m.key);
+
 const DEFAULT_LIMIT = 3;
 const MAX_LIMIT = 20;
 
@@ -58,6 +63,89 @@ async function loadAthleteDashboard(athleteId, limit) {
     metricCatalog: METRICS
   };
 }
+
+// GET /api/forcedecks/leaderboard — ranked all-time PR per athlete on
+// public metrics (jump height, peak power). Visible to athletes and
+// coaches. Athletes flagged hideFromLeaderboard or whose user account
+// is inactive are excluded. The response includes a viewerAthleteId
+// when the caller is an athlete so the UI can highlight their row.
+router.get("/leaderboard", async (req, res, next) => {
+  try {
+    const eligible = await prisma.athleteProfile.findMany({
+      where: {
+        hideFromLeaderboard: false,
+        user: { isActive: true }
+      },
+      select: { id: true, user: { select: { name: true } } }
+    });
+    const nameById = new Map(eligible.map((a) => [a.id, a.user.name]));
+    const eligibleIds = eligible.map((a) => a.id);
+
+    if (eligibleIds.length === 0) {
+      return res.json({
+        boards: LEADERBOARD_METRIC_KEYS.map((key) => ({ metricKey: key, rows: [] })),
+        viewerAthleteId: null
+      });
+    }
+
+    // For each metric, find the best (max) value per athlete along with
+    // the test date that produced it. groupBy gives us max; we then
+    // look up the test row to attach the date.
+    const boards = [];
+    for (const metricKey of LEADERBOARD_METRIC_KEYS) {
+      const metricDef = METRICS.find((m) => m.key === metricKey);
+      const topRows = await prisma.forceDecksMetric.findMany({
+        where: {
+          metricName: metricKey,
+          test: { athleteId: { in: eligibleIds } }
+        },
+        orderBy: { value: "desc" },
+        select: {
+          value: true,
+          unit: true,
+          test: { select: { athleteId: true, testDate: true } }
+        }
+      });
+
+      // Dedupe to one entry per athlete (the highest, which comes first
+      // because the query is value-desc).
+      const seen = new Set();
+      const ranked = [];
+      for (const row of topRows) {
+        const athleteId = row.test.athleteId;
+        if (seen.has(athleteId)) continue;
+        seen.add(athleteId);
+        ranked.push({
+          athleteId,
+          name: nameById.get(athleteId) || "Unknown",
+          value: row.value,
+          unit: row.unit || metricDef?.unit || "",
+          testDate: row.test.testDate
+        });
+      }
+
+      boards.push({
+        metricKey,
+        label: metricDef?.label || metricKey,
+        unit: metricDef?.unit || "",
+        rows: ranked
+      });
+    }
+
+    let viewerAthleteId = null;
+    if (req.user.role === "ATHLETE") {
+      const profile = await prisma.athleteProfile.findUnique({
+        where: { userId: req.user.id },
+        select: { id: true }
+      });
+      viewerAthleteId = profile?.id ?? null;
+    }
+
+    return res.json({ boards, viewerAthleteId });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 // GET /api/forcedecks/me — athlete sees their own latest tests
 router.get("/me", requireAthlete, async (req, res, next) => {
