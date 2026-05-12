@@ -68,7 +68,10 @@ router.get("/profiles", async (req, res, next) => {
 // into ForceDecksTest/ForceDecksMetric idempotently on externalId.
 router.post("/sync/:athleteId", async (req, res, next) => {
   try {
-    const result = await syncAthleteForceDecks(req.params.athleteId);
+    // Manual coach sync re-pulls full history so corrections to the
+    // mapping or aggregation overwrite existing rows. The nightly cron
+    // uses the cursor for cheap deltas.
+    const result = await syncAthleteForceDecks(req.params.athleteId, { fullHistory: true });
     await recordAudit({
       req,
       action: "vald.sync.athlete",

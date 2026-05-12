@@ -6,10 +6,6 @@ const { getValdConfig, assertValdCredentials, assertValdTenant } = require("./co
 const { mapValdResult } = require("./metrics");
 const { METRICS } = require("../utils/forcedecks");
 
-// JUMP_HEIGHT_INCHES — used to pick the athlete's best trial within a
-// test so every stored metric comes from the same (best) rep.
-const JUMP_HEIGHT_RESULT_ID = 6553613;
-
 // We only sync CMJ tests for now. Other test types (IMTP, SJ, balance)
 // produce different metric sets and would need their own handling.
 const SUPPORTED_TEST_TYPE = "CMJ";
@@ -23,38 +19,38 @@ function appKeyToUnit(appKey) {
   return METRICS.find((m) => m.key === appKey)?.unit || "";
 }
 
-function pickBestTrial(trials) {
-  let best = null;
-  let bestValue = -Infinity;
+function extractMetricsAcrossTrials(trials) {
+  // For each metric, walk every trial in the test and take the best
+  // value independently. "Best" = max for positive-trend metrics, min
+  // for negative-trend, max as a default for neutral. This matches
+  // VALD Hub's display: it doesn't lock all metrics to one rep, it
+  // shows the athlete's session-best for each metric.
+  const best = new Map();
   for (const trial of trials) {
-    const jh = (trial.results || []).find(
-      (r) => r.resultId === JUMP_HEIGHT_RESULT_ID && r.limb === "Trial"
-    );
-    if (jh && Number.isFinite(Number(jh.value)) && Number(jh.value) > bestValue) {
-      bestValue = Number(jh.value);
-      best = trial;
+    for (const r of trial.results || []) {
+      // Bilateral results expose the combined (Both-feet) measurement
+      // as limb="Trial". Left/Right/Asym are per-leg breakdowns we
+      // don't store at the test aggregate level.
+      if (r.limb !== "Trial") continue;
+      const mapped = mapValdResult(r.resultId, r.value);
+      if (!mapped) continue;
+      const current = best.get(mapped.appKey);
+      if (current === undefined) {
+        best.set(mapped.appKey, { value: mapped.value, trend: mapped.trend });
+        continue;
+      }
+      if (mapped.trend === "negative") {
+        if (mapped.value < current.value) best.set(mapped.appKey, { value: mapped.value, trend: mapped.trend });
+      } else {
+        if (mapped.value > current.value) best.set(mapped.appKey, { value: mapped.value, trend: mapped.trend });
+      }
     }
   }
-  return best || trials[0] || null;
-}
-
-function extractMetrics(trial) {
-  const seen = new Map();
-  for (const r of trial.results || []) {
-    // Bilateral results expose the combined (Both-feet) measurement as
-    // limb="Trial". Left/Right/Asym are per-leg breakdowns we don't
-    // store at the test aggregate level.
-    if (r.limb !== "Trial") continue;
-    const mapped = mapValdResult(r.resultId, r.value);
-    if (!mapped) continue;
-    if (seen.has(mapped.appKey)) continue;
-    seen.set(mapped.appKey, {
-      metricName: mapped.appKey,
-      value: mapped.value,
-      unit: appKeyToUnit(mapped.appKey)
-    });
-  }
-  return Array.from(seen.values());
+  return Array.from(best.entries()).map(([appKey, { value }]) => ({
+    metricName: appKey,
+    value,
+    unit: appKeyToUnit(appKey)
+  }));
 }
 
 async function fetchTestsSince(profileId, cursorIso, tenantId) {
@@ -102,7 +98,7 @@ async function upsertTest({ athleteId, test, metrics }) {
   });
 }
 
-async function syncAthleteForceDecks(athleteId) {
+async function syncAthleteForceDecks(athleteId, { fullHistory = false } = {}) {
   const config = getValdConfig();
   assertValdCredentials(config);
   assertValdTenant(config);
@@ -116,9 +112,13 @@ async function syncAthleteForceDecks(athleteId) {
     return { athleteId, imported: 0, skipped: 0, reason: "not_linked" };
   }
 
-  const cursorMs = athlete.valdLastSyncedAt
-    ? new Date(athlete.valdLastSyncedAt).getTime()
-    : Date.now() - INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+  // fullHistory: ignore the cursor and re-pull the last year. Manual
+  // syncs use this so re-syncing after a code fix actually overwrites
+  // existing rows with corrected values; the cron uses the cursor for
+  // efficient nightly deltas.
+  const cursorMs = fullHistory || !athlete.valdLastSyncedAt
+    ? Date.now() - INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+    : new Date(athlete.valdLastSyncedAt).getTime();
   const cursorIso = new Date(cursorMs).toISOString();
 
   const tests = await fetchTestsSince(athlete.valdProfileId, cursorIso, config.tenantId);
@@ -142,13 +142,7 @@ async function syncAthleteForceDecks(athleteId) {
       continue;
     }
 
-    const bestTrial = pickBestTrial(trials);
-    if (!bestTrial) {
-      skipped += 1;
-      continue;
-    }
-
-    const metrics = extractMetrics(bestTrial);
+    const metrics = extractMetricsAcrossTrials(trials);
     if (metrics.length === 0) {
       skipped += 1;
       continue;
