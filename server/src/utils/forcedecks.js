@@ -17,7 +17,7 @@ const METRICS = [
   { key: "eccentric_braking_rfd", label: "Ecc. Braking RFD", unit: "N/s", coachOnly: true },
   { key: "eccentric_peak_force", label: "Ecc. Peak Force", unit: "N", coachOnly: true },
   { key: "force_at_0_velocity", label: "Force @ 0 Velocity", unit: "N", coachOnly: true },
-  { key: "countermovement_depth", label: "Countermovement Depth", unit: "in", coachOnly: true },
+  { key: "countermovement_depth", label: "Countermovement Depth", unit: "cm", coachOnly: true },
 ];
 
 const METRIC_KEYS = new Set(METRICS.map((m) => m.key));

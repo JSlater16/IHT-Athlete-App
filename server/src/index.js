@@ -1,10 +1,12 @@
 const app = require("./app");
+const { startValdCron } = require("./vald/cron");
 
 const port = Number(process.env.PORT) || 4000;
 const host = process.env.HOST || "127.0.0.1";
 
 const server = app.listen(port, host, () => {
   console.log(`API listening on http://${host}:${port}`);
+  startValdCron();
 });
 
 server.on("error", (error) => {

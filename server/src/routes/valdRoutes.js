@@ -4,6 +4,8 @@ const express = require("express");
 const { prisma } = require("../utils/prisma");
 const { valdFetch } = require("../vald/client");
 const { getValdConfig, assertValdCredentials, assertValdTenant } = require("../vald/config");
+const { syncAthleteForceDecks, syncAllLinkedAthletes } = require("../vald/sync");
+const { recordAudit } = require("../utils/audit");
 
 const router = express.Router();
 
@@ -56,6 +58,50 @@ router.get("/profiles", async (req, res, next) => {
       });
 
     return res.json({ profiles });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// POST /api/vald/sync/:athleteId — coach-triggered manual sync for a
+// single athlete. Pulls new CMJ tests since the last sync, writes them
+// into ForceDecksTest/ForceDecksMetric idempotently on externalId.
+router.post("/sync/:athleteId", async (req, res, next) => {
+  try {
+    const result = await syncAthleteForceDecks(req.params.athleteId);
+    await recordAudit({
+      req,
+      action: "vald.sync.athlete",
+      targetType: "athlete",
+      targetId: req.params.athleteId,
+      targetLabel: result.athleteName || "",
+      metadata: { imported: result.imported, skipped: result.skipped, total: result.total }
+    });
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// POST /api/vald/sync — sync every athlete linked to a VALD profile.
+// Owner only; used as the cron handler too.
+router.post("/sync", async (req, res, next) => {
+  try {
+    if (req.user?.role !== "OWNER") {
+      return res.status(403).json({ error: "Owner access required." });
+    }
+    const results = await syncAllLinkedAthletes();
+    const imported = results.reduce((acc, r) => acc + (r.imported || 0), 0);
+    const errors = results.filter((r) => r.error).length;
+    await recordAudit({
+      req,
+      action: "vald.sync.all",
+      targetType: "vald",
+      targetId: null,
+      targetLabel: "",
+      metadata: { athletesSynced: results.length, imported, errors }
+    });
+    return res.json({ results, imported, errors });
   } catch (error) {
     return next(error);
   }

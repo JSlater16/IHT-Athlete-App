@@ -13,6 +13,9 @@ export default function CoachForceDecksAthletePage() {
   const { token } = useAuth();
   const [name, setName] = useState("");
   const [hexOpen, setHexOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -24,9 +27,31 @@ export default function CoachForceDecksAthletePage() {
     return () => ctrl.abort();
   }, [athleteId, token]);
 
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult("");
+    try {
+      const result = await apiRequest(`/api/vald/sync/${athleteId}`, { method: "POST", token });
+      if (result.reason === "not_linked") {
+        setSyncResult("Athlete is not linked to a VALD profile.");
+      } else {
+        setSyncResult(
+          `Imported ${result.imported} test${result.imported === 1 ? "" : "s"}` +
+            (result.skipped ? `, skipped ${result.skipped}.` : ".")
+        );
+        setRefreshKey((k) => k + 1);
+      }
+    } catch (err) {
+      setSyncResult(err.message || "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <>
       <ForcedecksDashboard
+        key={refreshKey}
         scope="coach"
         athleteId={athleteId}
         headerSlot={
@@ -37,8 +62,17 @@ export default function CoachForceDecksAthletePage() {
               </Link>
               <h1 className="fd-page-title">{name || "Athlete"}</h1>
               <p className="fd-page-sub">Full coach view — all metrics, latest session, trend.</p>
+              {syncResult ? <p className="fd-sync-result">{syncResult}</p> : null}
             </div>
             <div className="fd-page-actions">
+              <button
+                type="button"
+                className="fd-report-button"
+                onClick={handleSync}
+                disabled={syncing}
+              >
+                {syncing ? "Syncing…" : "Sync from VALD"}
+              </button>
               <button
                 type="button"
                 className="fd-report-button"

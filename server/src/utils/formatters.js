@@ -35,6 +35,7 @@ function serializeAthleteProfile(profile) {
     coachNotes: profile.coachNotes,
     hideFromLeaderboard: Boolean(profile.hideFromLeaderboard),
     valdProfileId: profile.valdProfileId || null,
+    valdLastSyncedAt: profile.valdLastSyncedAt || null,
     updatedAt: profile.updatedAt
   };
 }

@@ -58,6 +58,13 @@
   line-height: 1.5;
 }
 
+.fd-sync-result {
+  margin: 0.5rem 0 0;
+  color: var(--fd-accent);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
 .fd-back-link {
   display: inline-block;
   color: var(--fd-muted);
