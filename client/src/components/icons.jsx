@@ -34,16 +34,6 @@ export function HomeIcon(props) {
   );
 }
 
-export function HistoryIcon(props) {
-  return (
-    <Icon {...props}>
-      <path d="M3.5 12a8.5 8.5 0 1 0 2.8-6.3" />
-      <path d="M3 4v5h5" />
-      <path d="M12 7.5V12l3 2" />
-    </Icon>
-  );
-}
-
 export function ProfileIcon(props) {
   return (
     <Icon {...props}>

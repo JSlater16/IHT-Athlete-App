@@ -496,6 +496,39 @@
 
 /* Leaderboard ----------------------------------------------------- */
 
+.lb-toggle {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--fd-line-strong);
+  align-self: start;
+}
+
+.lb-toggle-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--fd-muted);
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+
+.lb-toggle-btn + .lb-toggle-btn {
+  border-left: 1px solid var(--fd-line);
+}
+
+.lb-toggle-btn:hover {
+  color: var(--fd-fg);
+}
+
+.lb-toggle-btn.is-active {
+  background: var(--fd-accent);
+  color: #071018;
+}
+
 .lb-board-grid {
   display: grid;
   gap: 1.25rem;

@@ -20,6 +20,7 @@ function formatDate(iso) {
 export default function AthleteLeaderboardPage() {
   const { token } = useAuth();
   const [state, setState] = useState({ status: "loading", data: null, error: null });
+  const [activeMetric, setActiveMetric] = useState("jump_height");
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -33,37 +34,49 @@ export default function AthleteLeaderboardPage() {
     return () => ctrl.abort();
   }, [token]);
 
+  const boards = state.data?.boards || [];
+  const activeBoard = boards.find((b) => b.metricKey === activeMetric) || boards[0] || null;
+
   return (
     <div className="fd-module">
       <div className="fd-page">
         <header className="fd-page-header">
           <div>
             <h1 className="fd-page-title">Leaderboards</h1>
-            <p className="fd-page-sub">All-time PR per athlete on jump height and peak power.</p>
+            <p className="fd-page-sub">All-time PR per athlete.</p>
           </div>
         </header>
+
+        {boards.length > 0 ? (
+          <div className="lb-toggle" role="tablist" aria-label="Leaderboard metric">
+            {boards.map((board) => {
+              const isActive = (activeBoard && board.metricKey === activeBoard.metricKey);
+              return (
+                <button
+                  key={board.metricKey}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`lb-toggle-btn ${isActive ? "is-active" : ""}`}
+                  onClick={() => setActiveMetric(board.metricKey)}
+                >
+                  {board.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
 
         {state.status === "loading" ? (
           <div className="fd-empty">Loading…</div>
         ) : state.status === "error" ? (
           <div className="fd-empty fd-empty-error">{state.error}</div>
-        ) : !state.data || state.data.boards.length === 0 ? (
+        ) : !activeBoard ? (
           <div className="fd-empty">No leaderboards available yet.</div>
         ) : (
-          <Boards data={state.data} />
+          <Board board={activeBoard} viewerId={state.data?.viewerAthleteId ?? null} />
         )}
       </div>
-    </div>
-  );
-}
-
-function Boards({ data }) {
-  const viewerId = data.viewerAthleteId;
-  return (
-    <div className="lb-board-grid">
-      {data.boards.map((board) => (
-        <Board key={board.metricKey} board={board} viewerId={viewerId} />
-      ))}
     </div>
   );
 }
@@ -85,10 +98,7 @@ function Board({ board, viewerId }) {
             const isViewer = viewerId && row.athleteId === viewerId;
             const rankClass = rank === 1 ? "lb-rank-1" : rank === 2 ? "lb-rank-2" : rank === 3 ? "lb-rank-3" : "";
             return (
-              <li
-                key={row.athleteId}
-                className={`lb-row ${isViewer ? "is-viewer" : ""}`}
-              >
+              <li key={row.athleteId} className={`lb-row ${isViewer ? "is-viewer" : ""}`}>
                 <span className={`lb-row-rank ${rankClass}`}>{rank}</span>
                 <div className="lb-row-name">
                   <strong>{row.name}</strong>

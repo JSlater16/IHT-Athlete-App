@@ -5,7 +5,6 @@ import AthleteLayout from "./layouts/AthleteLayout";
 import CoachLayout from "./layouts/CoachLayout";
 import LoginPage from "./pages/LoginPage";
 import AthleteHomePage from "./pages/athlete/AthleteHomePage";
-import AthleteHistoryPage from "./pages/athlete/AthleteHistoryPage";
 import AthleteProfilePage from "./pages/athlete/AthleteProfilePage";
 import AthleteForceDecksPage from "./pages/athlete/AthleteForceDecksPage";
 import AthleteLeaderboardPage from "./pages/athlete/AthleteLeaderboardPage";
@@ -60,7 +59,6 @@ export default function App() {
       >
         <Route index element={<Navigate to="home" replace />} />
         <Route path="home" element={<AthleteHomePage />} />
-        <Route path="history" element={<AthleteHistoryPage />} />
         <Route path="forcedecks" element={<AthleteForceDecksPage />} />
         <Route path="leaderboard" element={<AthleteLeaderboardPage />} />
         <Route path="profile" element={<AthleteProfilePage />} />
