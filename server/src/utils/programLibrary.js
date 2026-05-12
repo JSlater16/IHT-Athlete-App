@@ -15,7 +15,25 @@ async function readProgramLibrary() {
 }
 
 async function writeProgramLibrary(library) {
-  await fs.writeFile(LIBRARY_FILE, JSON.stringify(library, null, 2), "utf8");
+  // Atomic: write to a temp file in the same directory, then rename
+  // over the real one. If the process dies mid-write the original is
+  // intact. fs.rename is atomic on POSIX when source/target share a
+  // filesystem (they always do here — same dir).
+  const tmp = `${LIBRARY_FILE}.tmp-${process.pid}-${Date.now()}`;
+  await fs.writeFile(tmp, JSON.stringify(library, null, 2), "utf8");
+  await fs.rename(tmp, LIBRARY_FILE);
+}
+
+// Validates a proposed library shape and throws a 400-coded error if
+// it fails. Used by every mutating route so we validate BEFORE
+// touching the file on disk.
+function assertValidLibrary(library) {
+  const error = validateProgramLibrary(library);
+  if (error) {
+    const err = new Error(error);
+    err.status = 400;
+    throw err;
+  }
 }
 
 function summarizeProgramLibrary(library) {
@@ -103,5 +121,6 @@ module.exports = {
   readProgramLibrary,
   summarizeProgramLibrary,
   validateProgramLibrary,
+  assertValidLibrary,
   writeProgramLibrary
 };

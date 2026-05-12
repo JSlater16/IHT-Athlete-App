@@ -240,6 +240,12 @@
   background: var(--surface-translucent);
 }
 
+.program-builder-newlift-hint {
+  margin-top: 0.3rem;
+  color: var(--text-soft);
+  font-style: italic;
+}
+
 .coach-library-card {
   display: grid;
   gap: 0.85rem;

@@ -3,6 +3,7 @@ const {
   readProgramLibrary,
   summarizeProgramLibrary,
   validateProgramLibrary,
+  assertValidLibrary,
   writeProgramLibrary
 } = require("../utils/programLibrary");
 const { resolveProgramVariant, standardProgramVariant } = require("../utils/programVariant");
@@ -72,13 +73,74 @@ function normalizeExercisePayload(body) {
   };
 }
 
+// Resolve every day-lift entry in a program payload. Each entry either
+// references an existing liftId or carries a `newLift: {...}` object.
+// Returns { nextLifts, resolvedDays } where nextLifts is the library's
+// liftLibrary with any newly-created lifts appended (and deduped by
+// slug across the same submission).
+function resolveProgramLifts({ days, liftLibrary }) {
+  const liftsById = new Map(liftLibrary.map((lift) => [lift.id, lift]));
+  const liftsBySlug = new Map(liftLibrary.map((lift) => [slugify(lift.name), lift]));
+  const existingIds = new Set(liftLibrary.map((lift) => lift.id));
+  const nextLifts = liftLibrary.slice();
+
+  function resolveNewLift(payload, dayIndex, liftIndex) {
+    const normalized = normalizeExercisePayload(payload);
+    if (normalized.error) {
+      const err = new Error(
+        `Day ${dayIndex + 1}, exercise ${liftIndex + 1}: ${normalized.error}`
+      );
+      err.status = 400;
+      throw err;
+    }
+
+    // Dedup by slug — two inline new-lifts with the same name in the
+    // same save become one library entry, referenced twice.
+    const slug = slugify(normalized.value.name);
+    const existing = liftsBySlug.get(slug);
+    if (existing) {
+      return existing.id;
+    }
+
+    const id = createUniqueId(slug || "exercise", existingIds);
+    existingIds.add(id);
+    const created = { id, ...normalized.value };
+    nextLifts.push(created);
+    liftsById.set(id, created);
+    liftsBySlug.set(slug, created);
+    return id;
+  }
+
+  const resolvedDays = days.map((day, dayIndex) => ({
+    ...day,
+    lifts: day.lifts.map((lift, liftIndex) => {
+      let liftId = typeof lift?.liftId === "string" ? lift.liftId.trim() : "";
+      if (liftId && !liftsById.has(liftId)) {
+        liftId = "";
+      }
+      if (!liftId && lift?.newLift) {
+        liftId = resolveNewLift(lift.newLift, dayIndex, liftIndex);
+      }
+      if (!liftId) {
+        const err = new Error(
+          `Day ${dayIndex + 1}, exercise ${liftIndex + 1}: pick a library exercise or fill in a new one.`
+        );
+        err.status = 400;
+        throw err;
+      }
+      return { ...lift, liftId };
+    })
+  }));
+
+  return { nextLifts, resolvedDays };
+}
+
 function normalizeProgramPayload(body, liftLibrary) {
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const phase = typeof body?.phase === "string" ? body.phase.trim() : "";
   const requestedVariant = typeof body?.variant === "string" ? body.variant.trim() : standardProgramVariant;
   const frequency = Number(body?.frequency);
   const days = Array.isArray(body?.days) ? body.days : [];
-  const liftIds = new Set(liftLibrary.map((lift) => lift.id));
 
   if (!name) {
     return { error: "Program name is required." };
@@ -97,11 +159,20 @@ function normalizeProgramPayload(body, liftLibrary) {
     return { error: "Program type is invalid for the selected phase." };
   }
 
-  if (!Array.isArray(days) || days.length !== frequency) {
+  if (days.length !== frequency) {
     return { error: "Program must include one configured day for each weekly training day." };
   }
 
-  const normalizedDays = days.map((day, dayIndex) => {
+  // Resolve inline newLift entries first — this may extend liftLibrary
+  // and substitute liftIds.
+  let resolution;
+  try {
+    resolution = resolveProgramLifts({ days, liftLibrary });
+  } catch (error) {
+    return { error: error.message };
+  }
+
+  const normalizedDays = resolution.resolvedDays.map((day, dayIndex) => {
     const dayOffset = Number(day?.dayOffset);
     const lifts = Array.isArray(day?.lifts) ? day.lifts : [];
 
@@ -116,17 +187,13 @@ function normalizeProgramPayload(body, liftLibrary) {
     return {
       dayOffset,
       lifts: lifts.map((lift, liftIndex) => {
-        const liftId = typeof lift?.liftId === "string" ? lift.liftId.trim() : "";
+        const liftId = lift.liftId;
         const blockLabel = typeof lift?.blockLabel === "string" ? lift.blockLabel.trim() : "";
         const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
         const weight = typeof lift?.weight === "string" ? lift.weight.trim() : "";
         const notes = typeof lift?.notes === "string" ? lift.notes.trim() : "";
         const sets = Number(lift?.sets);
         const reps = Number(lift?.reps);
-
-        if (!liftId || !liftIds.has(liftId)) {
-          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} must use a valid library exercise.`);
-        }
 
         if (!Number.isFinite(sets) || sets < 1) {
           throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs valid sets.`);
@@ -140,15 +207,7 @@ function normalizeProgramPayload(body, liftLibrary) {
           throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs a weight value.`);
         }
 
-        return {
-          liftId,
-          blockLabel,
-          exerciseName,
-          sets,
-          reps,
-          weight,
-          notes
-        };
+        return { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
       })
     };
   });
@@ -160,17 +219,19 @@ function normalizeProgramPayload(body, liftLibrary) {
       variant,
       frequency,
       days: normalizedDays
-    }
+    },
+    nextLifts: resolution.nextLifts
   };
+}
+
+function libraryResponse(library) {
+  return { library, summary: summarizeProgramLibrary(library) };
 }
 
 router.get("/", async (_req, res, next) => {
   try {
     const library = await readProgramLibrary();
-    return res.json({
-      library,
-      summary: summarizeProgramLibrary(library)
-    });
+    return res.json(libraryResponse(library));
   } catch (error) {
     return next(error);
   }
@@ -202,10 +263,7 @@ router.post("/import", async (req, res, next) => {
       }
     });
 
-    return res.status(201).json({
-      library,
-      summary: summarizeProgramLibrary(library)
-    });
+    return res.status(201).json(libraryResponse(library));
   } catch (error) {
     return next(error);
   }
@@ -231,11 +289,7 @@ router.post("/lifts", async (req, res, next) => {
       liftLibrary: [...library.liftLibrary, createdLift]
     };
 
-    const validationError = validateProgramLibrary(nextLibrary);
-    if (validationError) {
-      return res.status(400).json({ error: validationError });
-    }
-
+    assertValidLibrary(nextLibrary);
     await writeProgramLibrary(nextLibrary);
 
     await recordAudit({
@@ -247,67 +301,132 @@ router.post("/lifts", async (req, res, next) => {
       metadata: { category: createdLift.category }
     });
 
-    return res.status(201).json({
-      lift: createdLift,
-      library: nextLibrary,
-      summary: summarizeProgramLibrary(nextLibrary)
-    });
+    return res.status(201).json({ lift: createdLift, ...libraryResponse(nextLibrary) });
+  } catch (error) {
+    if (error?.status === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    return next(error);
+  }
+});
+
+// Shared handler for POST /programs (create) and PUT /programs/:id
+// (replace). Lift entries inside the program payload may carry a
+// `newLift` object — those are created in-library as part of the same
+// atomic write.
+async function saveProgram(req, res, { mode }) {
+  const library = await readProgramLibrary();
+
+  let validated;
+  try {
+    validated = normalizeProgramPayload(req.body, library.liftLibrary);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  if (validated.error) {
+    return res.status(400).json({ error: validated.error });
+  }
+
+  const programId = mode === "update" ? req.params.id : null;
+  if (mode === "update") {
+    const exists = library.programs.some((p) => p.id === programId);
+    if (!exists) {
+      return res.status(404).json({ error: "Program not found." });
+    }
+  }
+
+  const existingProgramIds = new Set(library.programs.map((p) => p.id));
+  const id =
+    mode === "update"
+      ? programId
+      : createUniqueId(slugify(validated.value.name), existingProgramIds);
+  const savedProgram = { id, ...validated.value };
+
+  const nextPrograms =
+    mode === "update"
+      ? library.programs.map((p) => (p.id === id ? savedProgram : p))
+      : [...library.programs, savedProgram];
+
+  const nextLibrary = {
+    ...library,
+    liftLibrary: validated.nextLifts,
+    programs: nextPrograms
+  };
+
+  // Validate BEFORE writing. If anything's off, the file on disk is
+  // untouched and the client gets a clean 400.
+  try {
+    assertValidLibrary(nextLibrary);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  await writeProgramLibrary(nextLibrary);
+
+  await recordAudit({
+    req,
+    action: mode === "update" ? "program_library.update" : "program_library.create",
+    targetType: "program",
+    targetId: savedProgram.id,
+    targetLabel: savedProgram.name,
+    metadata: {
+      phase: savedProgram.phase,
+      variant: savedProgram.variant,
+      frequency: savedProgram.frequency,
+      liftCountDelta: validated.nextLifts.length - library.liftLibrary.length
+    }
+  });
+
+  return res.status(mode === "update" ? 200 : 201).json({
+    program: savedProgram,
+    ...libraryResponse(nextLibrary)
+  });
+}
+
+router.post("/programs", async (req, res, next) => {
+  try {
+    return await saveProgram(req, res, { mode: "create" });
   } catch (error) {
     return next(error);
   }
 });
 
-router.post("/programs", async (req, res, next) => {
+router.put("/programs/:id", async (req, res, next) => {
+  try {
+    return await saveProgram(req, res, { mode: "update" });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/programs/:id", async (req, res, next) => {
   try {
     const library = await readProgramLibrary();
-    let validated;
-
-    try {
-      validated = normalizeProgramPayload(req.body, library.liftLibrary);
-    } catch (error) {
-      return res.status(400).json({ error: error.message });
+    const target = library.programs.find((p) => p.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ error: "Program not found." });
     }
-
-    if (validated.error) {
-      return res.status(400).json({ error: validated.error });
-    }
-
-    const existingIds = new Set(library.programs.map((program) => program.id));
-    const createdProgram = {
-      id: createUniqueId(slugify(validated.value.name), existingIds),
-      ...validated.value
-    };
 
     const nextLibrary = {
       ...library,
-      programs: [...library.programs, createdProgram]
+      programs: library.programs.filter((p) => p.id !== target.id)
     };
 
-    const validationError = validateProgramLibrary(nextLibrary);
-    if (validationError) {
-      return res.status(400).json({ error: validationError });
-    }
-
+    // No need to re-validate — removing a program can't introduce
+    // dangling liftIds or other inconsistencies.
     await writeProgramLibrary(nextLibrary);
 
     await recordAudit({
       req,
-      action: "program_library.create",
+      action: "program_library.delete",
       targetType: "program",
-      targetId: createdProgram.id,
-      targetLabel: createdProgram.name,
-      metadata: {
-        phase: createdProgram.phase,
-        variant: createdProgram.variant,
-        frequency: createdProgram.frequency
-      }
+      targetId: target.id,
+      targetLabel: target.name,
+      metadata: { phase: target.phase, variant: target.variant, frequency: target.frequency }
     });
 
-    return res.status(201).json({
-      program: createdProgram,
-      library: nextLibrary,
-      summary: summarizeProgramLibrary(nextLibrary)
-    });
+    return res.json(libraryResponse(nextLibrary));
   } catch (error) {
     return next(error);
   }
