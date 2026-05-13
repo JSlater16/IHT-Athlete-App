@@ -295,6 +295,22 @@ export default function CoachAthleteProfilePage() {
       .filter(Boolean)
       .sort((left, right) => left.localeCompare(right));
   }, [library]);
+  // Variants present in the library for the currently-selected phase.
+  // Used for phases like "Developmental" where the library defines
+  // free-form variants (Base, Advanced) rather than the hardcoded
+  // Eccentrics pair.
+  const phaseVariantOptions = useMemo(() => {
+    if (!library?.programs?.length) return [];
+    return [
+      ...new Set(
+        library.programs
+          .filter((program) => program.phase === overviewForm.phase)
+          .map((program) => program.variant || standardProgramVariant)
+      )
+    ]
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right));
+  }, [library, overviewForm.phase]);
   const variantOptions = useMemo(() => {
     if (overviewForm.phase === "Prep") {
       return prepProgramOptions.length > 0 ? prepProgramOptions : [standardProgramVariant];
@@ -304,8 +320,14 @@ export default function CoachAthleteProfilePage() {
       return eccentricProgramVariants;
     }
 
+    // Other phases: surface whatever variants the library actually has
+    // for this phase. Fall back to Standard when none are defined yet.
+    if (phaseVariantOptions.length > 0) {
+      return phaseVariantOptions;
+    }
+
     return [standardProgramVariant];
-  }, [overviewForm.phase, prepProgramOptions]);
+  }, [overviewForm.phase, prepProgramOptions, phaseVariantOptions]);
   const frequencyOptions = useMemo(() => {
     const options = librarySummary.frequencies.length > 0 ? librarySummary.frequencies : [3, 4, 5];
     return overviewForm.programmingDays && !options.includes(Number(overviewForm.programmingDays))
@@ -964,20 +986,35 @@ export default function CoachAthleteProfilePage() {
                     <span>Training phase</span>
                     <select
                       value={overviewForm.phase}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const nextPhase = event.target.value;
+                        const libraryVariants = [
+                          ...new Set(
+                            (library?.programs || [])
+                              .filter((program) => program.phase === nextPhase)
+                              .map((program) => program.variant || standardProgramVariant)
+                          )
+                        ].filter(Boolean);
+                        let nextVariant;
+                        if (nextPhase === "Prep") {
+                          nextVariant = prepProgramOptions[0] || standardProgramVariant;
+                        } else if (nextPhase === "Eccentrics") {
+                          nextVariant = eccentricProgramVariants.includes(overviewForm.programVariant)
+                            ? overviewForm.programVariant
+                            : eccentricProgramVariants[0];
+                        } else if (libraryVariants.length > 0) {
+                          nextVariant = libraryVariants.includes(overviewForm.programVariant)
+                            ? overviewForm.programVariant
+                            : libraryVariants[0];
+                        } else {
+                          nextVariant = standardProgramVariant;
+                        }
                         setOverviewForm((current) => ({
                           ...current,
-                          phase: event.target.value,
-                          programVariant:
-                            event.target.value === "Prep"
-                              ? prepProgramOptions[0] || standardProgramVariant
-                              : event.target.value === "Eccentrics"
-                              ? eccentricProgramVariants.includes(current.programVariant)
-                                ? current.programVariant
-                                : eccentricProgramVariants[0]
-                              : standardProgramVariant
-                        }))
-                      }
+                          phase: nextPhase,
+                          programVariant: nextVariant
+                        }));
+                      }}
                       required
                     >
                       {phaseOptions.map((phase) => (
