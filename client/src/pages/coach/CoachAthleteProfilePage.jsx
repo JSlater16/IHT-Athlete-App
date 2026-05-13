@@ -24,7 +24,7 @@ const tabs = [
   { id: "rehab", label: "Rehab" }
 ];
 
-const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed", "Developmental"];
+const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"];
 const fallbackModelOptions = ["10-Week", "20-Week"];
 const standardProgramVariant = "Standard";
 const eccentricProgramVariants = ["Alactic Eccentrics", "Lactic Eccentrics"];
@@ -295,22 +295,6 @@ export default function CoachAthleteProfilePage() {
       .filter(Boolean)
       .sort((left, right) => left.localeCompare(right));
   }, [library]);
-  // Variants present in the library for the currently-selected phase.
-  // Used for phases like "Developmental" where the library defines
-  // free-form variants (Base, Advanced) rather than the hardcoded
-  // Eccentrics pair.
-  const phaseVariantOptions = useMemo(() => {
-    if (!library?.programs?.length) return [];
-    return [
-      ...new Set(
-        library.programs
-          .filter((program) => program.phase === overviewForm.phase)
-          .map((program) => program.variant || standardProgramVariant)
-      )
-    ]
-      .filter(Boolean)
-      .sort((left, right) => left.localeCompare(right));
-  }, [library, overviewForm.phase]);
   const variantOptions = useMemo(() => {
     if (overviewForm.phase === "Prep") {
       return prepProgramOptions.length > 0 ? prepProgramOptions : [standardProgramVariant];
@@ -320,14 +304,8 @@ export default function CoachAthleteProfilePage() {
       return eccentricProgramVariants;
     }
 
-    // Other phases: surface whatever variants the library actually has
-    // for this phase. Fall back to Standard when none are defined yet.
-    if (phaseVariantOptions.length > 0) {
-      return phaseVariantOptions;
-    }
-
     return [standardProgramVariant];
-  }, [overviewForm.phase, prepProgramOptions, phaseVariantOptions]);
+  }, [overviewForm.phase, prepProgramOptions]);
   const frequencyOptions = useMemo(() => {
     const options = librarySummary.frequencies.length > 0 ? librarySummary.frequencies : [3, 4, 5];
     return overviewForm.programmingDays && !options.includes(Number(overviewForm.programmingDays))
@@ -986,35 +964,20 @@ export default function CoachAthleteProfilePage() {
                     <span>Training phase</span>
                     <select
                       value={overviewForm.phase}
-                      onChange={(event) => {
-                        const nextPhase = event.target.value;
-                        const libraryVariants = [
-                          ...new Set(
-                            (library?.programs || [])
-                              .filter((program) => program.phase === nextPhase)
-                              .map((program) => program.variant || standardProgramVariant)
-                          )
-                        ].filter(Boolean);
-                        let nextVariant;
-                        if (nextPhase === "Prep") {
-                          nextVariant = prepProgramOptions[0] || standardProgramVariant;
-                        } else if (nextPhase === "Eccentrics") {
-                          nextVariant = eccentricProgramVariants.includes(overviewForm.programVariant)
-                            ? overviewForm.programVariant
-                            : eccentricProgramVariants[0];
-                        } else if (libraryVariants.length > 0) {
-                          nextVariant = libraryVariants.includes(overviewForm.programVariant)
-                            ? overviewForm.programVariant
-                            : libraryVariants[0];
-                        } else {
-                          nextVariant = standardProgramVariant;
-                        }
+                      onChange={(event) =>
                         setOverviewForm((current) => ({
                           ...current,
-                          phase: nextPhase,
-                          programVariant: nextVariant
-                        }));
-                      }}
+                          phase: event.target.value,
+                          programVariant:
+                            event.target.value === "Prep"
+                              ? prepProgramOptions[0] || standardProgramVariant
+                              : event.target.value === "Eccentrics"
+                              ? eccentricProgramVariants.includes(current.programVariant)
+                                ? current.programVariant
+                                : eccentricProgramVariants[0]
+                              : standardProgramVariant
+                        }))
+                      }
                       required
                     >
                       {phaseOptions.map((phase) => (
@@ -1192,7 +1155,7 @@ export default function CoachAthleteProfilePage() {
                   </>
                 ) : (
                   <p className="muted-copy">
-                    {overviewForm.phase} is handled outside the standard {orderedTrainingPhases.join(", ")} timeline.
+                    Rehab is handled outside the standard Prep, Eccentrics, Iso, Power, Speed timeline.
                   </p>
                 )}
               </div>

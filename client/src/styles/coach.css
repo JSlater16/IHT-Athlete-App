@@ -561,54 +561,6 @@
   font-style: italic;
 }
 
-.lift-table-pair-badge {
-  display: inline-block;
-  margin-top: 0.25rem;
-  margin-left: 0.55rem;
-  padding: 0.1rem 0.45rem;
-  border-radius: 8px;
-  background: rgba(14, 165, 233, 0.12);
-  color: #0ea5e9;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.lift-table-tempo {
-  display: block;
-  padding-left: 0.55rem;
-  padding-top: 0.15rem;
-  font-size: 0.72rem;
-  color: var(--text-soft);
-}
-
-.builder-segment-tab-label {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  line-height: 1.15;
-}
-
-.builder-segment-tab-sublabel {
-  font-size: 0.7rem;
-  font-weight: 500;
-  opacity: 0.78;
-  margin-top: 0.1rem;
-}
-
-.builder-day-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.85rem;
-  align-items: end;
-  justify-content: space-between;
-}
-
-.builder-day-name-field {
-  flex: 1 1 240px;
-}
-
 .lift-table-actions {
   display: flex;
   gap: 0.2rem;
