@@ -10,8 +10,27 @@ const { resolveProgramVariant, standardProgramVariant } = require("../utils/prog
 const { recordAudit } = require("../utils/audit");
 
 const router = express.Router();
-const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"]);
+const allowedPhases = new Set([
+  "Rehab",
+  "Prep",
+  "Eccentrics",
+  "Iso",
+  "Power",
+  "Speed",
+  "Developmental"
+]);
 const allowedFrequencies = new Set([3, 4, 5]);
+
+function nonEmptyString(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : "";
+  }
+  return "";
+}
 
 function slugify(value) {
   return String(value || "")
@@ -175,6 +194,7 @@ function normalizeProgramPayload(body, liftLibrary) {
   const normalizedDays = resolution.resolvedDays.map((day, dayIndex) => {
     const dayOffset = Number(day?.dayOffset);
     const lifts = Array.isArray(day?.lifts) ? day.lifts : [];
+    const dayName = nonEmptyString(day?.dayName);
 
     if (!Number.isFinite(dayOffset) || dayOffset < 0 || dayOffset > 6) {
       throw new Error(`Day ${dayIndex + 1} must use a week position between 0 and 6.`);
@@ -184,32 +204,37 @@ function normalizeProgramPayload(body, liftLibrary) {
       throw new Error(`Day ${dayIndex + 1} must include at least one exercise.`);
     }
 
-    return {
+    const normalizedDay = {
       dayOffset,
       lifts: lifts.map((lift, liftIndex) => {
         const liftId = lift.liftId;
-        const blockLabel = typeof lift?.blockLabel === "string" ? lift.blockLabel.trim() : "";
-        const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
-        const weight = typeof lift?.weight === "string" ? lift.weight.trim() : "";
+        const blockLabel = nonEmptyString(lift?.blockLabel);
+        const exerciseName = nonEmptyString(lift?.exerciseName);
+        const weight = nonEmptyString(lift?.weight);
         const notes = typeof lift?.notes === "string" ? lift.notes.trim() : "";
-        const sets = Number(lift?.sets);
-        const reps = Number(lift?.reps);
+        const sets = nonEmptyString(lift?.sets);
+        const reps = nonEmptyString(lift?.reps);
+        const tempo = typeof lift?.tempo === "string" ? lift.tempo.trim() : "";
+        const pairedWith = typeof lift?.pairedWith === "string" ? lift.pairedWith.trim() : "";
 
-        if (!Number.isFinite(sets) || sets < 1) {
-          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs valid sets.`);
+        if (!sets) {
+          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs sets.`);
         }
-
-        if (!Number.isFinite(reps) || reps < 1) {
-          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs valid reps.`);
+        if (!reps) {
+          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs reps.`);
         }
-
         if (!weight) {
           throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs a weight value.`);
         }
 
-        return { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
+        const entry = { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
+        if (tempo) entry.tempo = tempo;
+        if (pairedWith) entry.pairedWith = pairedWith;
+        return entry;
       })
     };
+    if (dayName) normalizedDay.dayName = dayName;
+    return normalizedDay;
   });
 
   return {
@@ -507,23 +532,23 @@ function normalizeMiscPayload(body, liftLibrary) {
 
   const normalizedLifts = resolution.resolvedDays[0].lifts.map((lift, liftIndex) => {
     const liftId = lift.liftId;
-    const blockLabel = typeof lift?.blockLabel === "string" ? lift.blockLabel.trim() : "";
-    const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
-    const weight = typeof lift?.weight === "string" ? lift.weight.trim() : "";
+    const blockLabel = nonEmptyString(lift?.blockLabel);
+    const exerciseName = nonEmptyString(lift?.exerciseName);
+    const weight = nonEmptyString(lift?.weight);
     const notes = typeof lift?.notes === "string" ? lift.notes.trim() : "";
-    const sets = Number(lift?.sets);
-    const reps = Number(lift?.reps);
+    const sets = nonEmptyString(lift?.sets);
+    const reps = nonEmptyString(lift?.reps);
+    const tempo = typeof lift?.tempo === "string" ? lift.tempo.trim() : "";
+    const pairedWith = typeof lift?.pairedWith === "string" ? lift.pairedWith.trim() : "";
 
-    if (!Number.isFinite(sets) || sets < 1) {
-      throw new Error(`Lift ${liftIndex + 1} needs valid sets.`);
-    }
-    if (!Number.isFinite(reps) || reps < 1) {
-      throw new Error(`Lift ${liftIndex + 1} needs valid reps.`);
-    }
-    if (!weight) {
-      throw new Error(`Lift ${liftIndex + 1} needs a weight value.`);
-    }
-    return { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
+    if (!sets) throw new Error(`Lift ${liftIndex + 1} needs sets.`);
+    if (!reps) throw new Error(`Lift ${liftIndex + 1} needs reps.`);
+    if (!weight) throw new Error(`Lift ${liftIndex + 1} needs a weight value.`);
+
+    const entry = { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
+    if (tempo) entry.tempo = tempo;
+    if (pairedWith) entry.pairedWith = pairedWith;
+    return entry;
   });
 
   return { value: { name, lifts: normalizedLifts }, nextLifts: resolution.nextLifts };

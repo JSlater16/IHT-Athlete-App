@@ -21,7 +21,32 @@ const { validatePassword } = require("../utils/password");
 const { passwordChangeLimiter } = require("../utils/rateLimiters");
 
 const router = express.Router();
-const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"]);
+const allowedPhases = new Set([
+  "Rehab",
+  "Prep",
+  "Eccentrics",
+  "Iso",
+  "Power",
+  "Speed",
+  "Developmental"
+]);
+
+// Library JSON now stores sets/reps as free-form strings ("8-12",
+// "30 sec", "max reps"). When we materialize that into an athlete's
+// week we still need integers for the Prisma Lift row, so pull the
+// largest integer out of the string (max of a range, or first int
+// found) and fall back to the supplied default if none.
+function pickInt(value, fallback) {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  if (typeof value === "string") {
+    const matches = value.match(/-?\d+/g);
+    if (matches && matches.length) {
+      const nums = matches.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+      if (nums.length) return Math.max(...nums);
+    }
+  }
+  return fallback;
+}
 const allowedModels = new Set(["10-Week", "20-Week"]);
 const allowedFrequencies = new Set([3, 4, 5]);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -838,15 +863,37 @@ router.post("/:id/apply-program", async (req, res, next) => {
       return day.lifts.map((configuredLift) => {
         const libraryLift = library.liftLibrary.find((lift) => lift.id === configuredLift.liftId);
 
+        // Preserve range/duration strings in the notes when we have to
+        // squash them into the Prisma integer columns. Coaches who
+        // wrote "8-12" or "30 sec" still get that text on the athlete
+        // card.
+        const setsRaw = configuredLift.sets ?? libraryLift?.defaultSets ?? "3";
+        const repsRaw = configuredLift.reps ?? libraryLift?.defaultReps ?? "8";
+        const sets = pickInt(setsRaw, 3);
+        const reps = pickInt(repsRaw, 8);
+
+        const extraNoteParts = [];
+        if (typeof setsRaw === "string" && setsRaw.trim() && pickInt(setsRaw, null) !== Number(setsRaw)) {
+          extraNoteParts.push(`Sets: ${setsRaw}`);
+        }
+        if (typeof repsRaw === "string" && repsRaw.trim() && pickInt(repsRaw, null) !== Number(repsRaw)) {
+          extraNoteParts.push(`Reps: ${repsRaw}`);
+        }
+        if (configuredLift.tempo) extraNoteParts.push(`Tempo: ${configuredLift.tempo}`);
+        if (configuredLift.pairedWith) extraNoteParts.push(`Paired with ${configuredLift.pairedWith}`);
+
+        const baseNotes = configuredLift.notes || libraryLift?.defaultNotes || "";
+        const composedNotes = [extraNoteParts.join(" · "), baseNotes].filter(Boolean).join("\n");
+
         return {
           athleteId: athlete.id,
           date,
           blockLabel: configuredLift.blockLabel || "",
           exerciseName: configuredLift.exerciseName || libraryLift?.name || "Program Lift",
-          sets: Number(configuredLift.sets || libraryLift?.defaultSets || 3),
-          reps: Number(configuredLift.reps || libraryLift?.defaultReps || 8),
+          sets,
+          reps,
           weight: configuredLift.weight || libraryLift?.defaultWeight || "Coach Prescribed",
-          notes: configuredLift.notes || libraryLift?.defaultNotes || "",
+          notes: composedNotes,
           completed: false
         };
       });

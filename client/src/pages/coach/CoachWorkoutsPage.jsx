@@ -3,11 +3,20 @@ import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
 import ConfirmModal from "../../components/ConfirmModal";
 
-const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"];
+const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed", "Developmental"];
 const allFrequencies = [3, 4, 5];
 const standardProgramVariant = "Standard";
 const eccentricProgramVariants = ["Alactic Eccentrics", "Lactic Eccentrics"];
-const workoutPlacementOptions = ["Prep", "Block 1", "Block 2", "Block 3", "Block 4"];
+const workoutPlacementOptions = [
+  "Warm-up",
+  "Prep",
+  "Main",
+  "Block 1",
+  "Block 2",
+  "Block 3",
+  "Block 4",
+  "Cooldown"
+];
 const customExerciseCategory = "Custom";
 
 function normalizeText(value) {
@@ -15,7 +24,7 @@ function normalizeText(value) {
 }
 
 function familyKey(program) {
-  return `${program.name}|${program.phase}|${program.variant || standardProgramVariant}`;
+  return `${program.name}|${program.phase}`;
 }
 
 function groupProgramFamilies(programs) {
@@ -27,17 +36,42 @@ function groupProgramFamilies(programs) {
         key,
         name: p.name,
         phase: p.phase,
-        variant: p.variant || standardProgramVariant,
-        byFrequency: new Map()
+        variants: new Set(),
+        frequencies: new Set(),
+        members: []
       });
     }
-    map.get(key).byFrequency.set(Number(p.frequency), p);
+    const fam = map.get(key);
+    fam.variants.add(p.variant || standardProgramVariant);
+    fam.frequencies.add(Number(p.frequency));
+    fam.members.push(p);
   }
-  return Array.from(map.values()).sort((a, b) => {
-    if (a.phase !== b.phase) return phaseOptions.indexOf(a.phase) - phaseOptions.indexOf(b.phase);
-    if (a.variant !== b.variant) return a.variant.localeCompare(b.variant);
-    return a.name.localeCompare(b.name);
-  });
+  return Array.from(map.values())
+    .map((fam) => ({
+      ...fam,
+      members: fam.members.slice().sort((a, b) => {
+        const av = String(a.variant || standardProgramVariant);
+        const bv = String(b.variant || standardProgramVariant);
+        if (av !== bv) return av.localeCompare(bv);
+        return Number(a.frequency) - Number(b.frequency);
+      })
+    }))
+    .sort((a, b) => {
+      if (a.phase !== b.phase) {
+        return phaseOptions.indexOf(a.phase) - phaseOptions.indexOf(b.phase);
+      }
+      return a.name.localeCompare(b.name);
+    });
+}
+
+function chipLabelFor(member, family) {
+  const variant = member.variant || standardProgramVariant;
+  const freq = `${member.frequency}d`;
+  const variantsVary = family.variants.size > 1;
+  const frequenciesVary = family.frequencies.size > 1;
+  if (variantsVary && frequenciesVary) return `${variant} · ${freq}`;
+  if (variantsVary) return variant;
+  return `${member.frequency} days`;
 }
 
 function phaseClass(phase) {
@@ -82,6 +116,7 @@ function programToForm(program) {
     frequency: Number(program.frequency) || 3,
     days: (program.days || []).map((day) => ({
       dayOffset: Number(day.dayOffset) || 0,
+      dayName: day.dayName || "",
       lifts: (day.lifts || []).map((lift) => ({
         liftId: lift.liftId || "",
         blockLabel: lift.blockLabel || "Block 1",
@@ -89,7 +124,9 @@ function programToForm(program) {
         sets: String(lift.sets ?? "3"),
         reps: String(lift.reps ?? "5"),
         weight: lift.weight || "Bodyweight",
-        notes: lift.notes || ""
+        notes: lift.notes || "",
+        tempo: lift.tempo || "",
+        pairedWith: lift.pairedWith || ""
       }))
     }))
   };
@@ -97,6 +134,18 @@ function programToForm(program) {
 
 function getVariantOptions(phase) {
   return phase === "Eccentrics" ? eccentricProgramVariants : [standardProgramVariant];
+}
+
+// New library-lift defaults need integers, but the program lift row
+// may hold strings like "8-12" or "30 sec". Pull out the largest
+// integer in the string; fall back to a reasonable default.
+function parseDefaultInt(value, fallback) {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  if (typeof value === "string") {
+    const matches = value.match(/\d+/g);
+    if (matches && matches.length) return Math.max(...matches.map(Number));
+  }
+  return fallback;
 }
 
 function createMiscLiftRow() {
@@ -117,7 +166,9 @@ function miscToForm(workout) {
       sets: String(lift.sets ?? "3"),
       reps: String(lift.reps ?? "5"),
       weight: lift.weight || "Bodyweight",
-      notes: lift.notes || ""
+      notes: lift.notes || "",
+      tempo: lift.tempo || "",
+      pairedWith: lift.pairedWith || ""
     }))
   };
 }
@@ -301,8 +352,8 @@ export default function CoachWorkoutsPage() {
           liftId,
           blockLabel: lift.blockLabel,
           exerciseName: trimmedName,
-          sets: Number(lift.sets),
-          reps: Number(lift.reps),
+          sets: String(lift.sets).trim(),
+          reps: String(lift.reps).trim(),
           weight: lift.weight.trim(),
           notes: lift.notes.trim()
         };
@@ -310,8 +361,8 @@ export default function CoachWorkoutsPage() {
           entry.newLift = {
             name: trimmedName,
             category: customExerciseCategory,
-            defaultSets: Number(lift.sets),
-            defaultReps: Number(lift.reps),
+            defaultSets: parseDefaultInt(lift.sets, 3),
+            defaultReps: parseDefaultInt(lift.reps, 8),
             defaultWeight: lift.weight.trim(),
             defaultNotes: lift.notes.trim()
           };
@@ -327,9 +378,8 @@ export default function CoachWorkoutsPage() {
     for (let liftIndex = 0; liftIndex < miscForm.lifts.length; liftIndex += 1) {
       const lift = miscForm.lifts[liftIndex];
       if (!lift.exerciseName.trim()) return `Lift ${liftIndex + 1}: exercise is required.`;
-      if (Number(lift.sets) < 1 || Number(lift.reps) < 1) {
-        return `Lift ${liftIndex + 1}: sets and reps must be at least 1.`;
-      }
+      if (!String(lift.sets).trim()) return `Lift ${liftIndex + 1}: sets is required.`;
+      if (!String(lift.reps).trim()) return `Lift ${liftIndex + 1}: reps is required.`;
       if (!lift.weight.trim()) return `Lift ${liftIndex + 1}: weight is required.`;
     }
     return null;
@@ -412,19 +462,17 @@ export default function CoachWorkoutsPage() {
     setProgramError("");
   }
 
-  function openFamilyFrequency(family, frequency) {
-    const existing = family.byFrequency.get(frequency);
-    if (existing) {
-      openProgramEdit(existing);
-    } else {
-      // Create a new program in the same family, prefilled.
-      openProgramCreate({
-        name: family.name,
-        phase: family.phase,
-        variant: family.variant,
-        frequency
-      });
-    }
+  function openFamilyMember(program) {
+    openProgramEdit(program);
+  }
+
+  function addFamilyVariant(family, seed) {
+    openProgramCreate({
+      name: family.name,
+      phase: family.phase,
+      variant: seed.variant || standardProgramVariant,
+      frequency: seed.frequency
+    });
   }
 
   function updateProgramDay(dayIndex, updater) {
@@ -496,36 +544,42 @@ export default function CoachWorkoutsPage() {
     return {
       name: programForm.name.trim(),
       phase: programForm.phase,
-      variant: programForm.variant,
+      variant: programForm.variant?.trim() || standardProgramVariant,
       frequency: Number(programForm.frequency),
-      days: programForm.days.map((day) => ({
-        dayOffset: Number(day.dayOffset),
-        lifts: day.lifts.map((lift) => {
-          const trimmedName = lift.exerciseName.trim();
-          const matched = liftByNormalizedName.get(normalizeText(trimmedName));
-          const liftId = matched?.id || lift.liftId || "";
-          const entry = {
-            liftId,
-            blockLabel: lift.blockLabel,
-            exerciseName: trimmedName,
-            sets: Number(lift.sets),
-            reps: Number(lift.reps),
-            weight: lift.weight.trim(),
-            notes: lift.notes.trim()
-          };
-          if (!liftId) {
-            entry.newLift = {
-              name: trimmedName,
-              category: customExerciseCategory,
-              defaultSets: Number(lift.sets),
-              defaultReps: Number(lift.reps),
-              defaultWeight: lift.weight.trim(),
-              defaultNotes: lift.notes.trim()
+      days: programForm.days.map((day) => {
+        const out = {
+          dayOffset: Number(day.dayOffset),
+          lifts: day.lifts.map((lift) => {
+            const trimmedName = lift.exerciseName.trim();
+            const matched = liftByNormalizedName.get(normalizeText(trimmedName));
+            const liftId = matched?.id || lift.liftId || "";
+            const entry = {
+              liftId,
+              blockLabel: lift.blockLabel,
+              exerciseName: trimmedName,
+              sets: String(lift.sets).trim(),
+              reps: String(lift.reps).trim(),
+              weight: lift.weight.trim(),
+              notes: lift.notes.trim()
             };
-          }
-          return entry;
-        })
-      }))
+            if (lift.tempo) entry.tempo = lift.tempo;
+            if (lift.pairedWith) entry.pairedWith = lift.pairedWith;
+            if (!liftId) {
+              entry.newLift = {
+                name: trimmedName,
+                category: customExerciseCategory,
+                defaultSets: parseDefaultInt(lift.sets, 3),
+                defaultReps: parseDefaultInt(lift.reps, 8),
+                defaultWeight: lift.weight.trim(),
+                defaultNotes: lift.notes.trim()
+              };
+            }
+            return entry;
+          })
+        };
+        if (day.dayName) out.dayName = day.dayName;
+        return out;
+      })
     };
   }
 
@@ -539,8 +593,11 @@ export default function CoachWorkoutsPage() {
         if (!lift.exerciseName.trim()) {
           return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: exercise name is required.`;
         }
-        if (Number(lift.sets) < 1 || Number(lift.reps) < 1) {
-          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: sets and reps must be at least 1.`;
+        if (!String(lift.sets).trim()) {
+          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: sets is required.`;
+        }
+        if (!String(lift.reps).trim()) {
+          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: reps is required.`;
         }
         if (!lift.weight.trim()) {
           return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: weight is required.`;
@@ -646,7 +703,8 @@ export default function CoachWorkoutsPage() {
               <ProgramFamilyCard
                 key={family.key}
                 family={family}
-                onOpenFrequency={openFamilyFrequency}
+                onOpenMember={openFamilyMember}
+                onAddVariant={addFamilyVariant}
               />
             ))}
           </div>
@@ -805,33 +863,64 @@ export default function CoachWorkoutsPage() {
 
 // ------- Components -------
 
-function ProgramFamilyCard({ family, onOpenFrequency }) {
+function ProgramFamilyCard({ family, onOpenMember, onAddVariant }) {
+  // Single-variant families: keep the original 3/4/5 empty-slot UX.
+  // Multi-variant families: just list the existing combos.
+  const singleVariant = family.variants.size <= 1;
+  const onlyVariant = singleVariant
+    ? Array.from(family.variants)[0] || standardProgramVariant
+    : null;
+  const subtitle = singleVariant && onlyVariant && onlyVariant !== standardProgramVariant
+    ? `${family.phase} · ${onlyVariant}`
+    : family.phase;
+
   return (
     <article className={`program-family-card ${phaseClass(family.phase)}`}>
       <header className="program-family-card-header">
         <div>
           <h3 className="program-family-name">{family.name}</h3>
-          <p className="muted-copy compact-copy">
-            {family.phase}
-            {family.variant && family.variant !== standardProgramVariant ? ` · ${family.variant}` : ""}
-          </p>
+          <p className="muted-copy compact-copy">{subtitle}</p>
         </div>
       </header>
       <div className="program-family-frequencies">
-        {allFrequencies.map((freq) => {
-          const exists = family.byFrequency.has(freq);
-          return (
-            <button
-              key={freq}
-              type="button"
-              className={`program-family-freq ${exists ? "is-existing" : "is-empty"}`}
-              onClick={() => onOpenFrequency(family, freq)}
-              title={exists ? `Edit ${freq}-day version` : `Create a ${freq}-day version`}
-            >
-              {exists ? `${freq} days` : `+ ${freq} days`}
-            </button>
-          );
-        })}
+        {singleVariant
+          ? allFrequencies.map((freq) => {
+              const member = family.members.find((m) => Number(m.frequency) === freq);
+              if (member) {
+                return (
+                  <button
+                    key={`m-${freq}`}
+                    type="button"
+                    className="program-family-freq is-existing"
+                    onClick={() => onOpenMember(member)}
+                    title={`Edit ${freq}-day version`}
+                  >
+                    {freq} days
+                  </button>
+                );
+              }
+              return (
+                <button
+                  key={`empty-${freq}`}
+                  type="button"
+                  className="program-family-freq is-empty"
+                  onClick={() => onAddVariant(family, { frequency: freq, variant: onlyVariant })}
+                  title={`Create a ${freq}-day version`}
+                >
+                  + {freq} days
+                </button>
+              );
+            })
+          : family.members.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                className="program-family-freq is-existing"
+                onClick={() => onOpenMember(member)}
+              >
+                {chipLabelFor(member, family)}
+              </button>
+            ))}
       </div>
     </article>
   );
@@ -999,13 +1088,30 @@ function ProgramFormModal(props) {
             </label>
             <label className="field">
               <span>Program type</span>
-              <select
-                value={form.variant}
-                onChange={(e) => onFieldChange("variant", e.target.value)}
-                disabled={form.phase !== "Eccentrics"}
-              >
-                {getVariantOptions(form.phase).map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              {form.phase === "Eccentrics" ? (
+                <select
+                  value={form.variant}
+                  onChange={(e) => onFieldChange("variant", e.target.value)}
+                >
+                  {getVariantOptions(form.phase).map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.variant}
+                  onChange={(e) => onFieldChange("variant", e.target.value)}
+                  placeholder="Standard"
+                  list="program-variant-suggestions"
+                />
+              )}
+              <datalist id="program-variant-suggestions">
+                <option value="Standard" />
+                <option value="Base" />
+                <option value="Advanced" />
+                <option value="Returning Athlete" />
+              </datalist>
             </label>
             <label className="field">
               <span>Frequency</span>
@@ -1073,6 +1179,7 @@ function ProgramBuilderBody({
   const daySegments = form.days.map((day, dayIndex) => ({
     key: `day-${dayIndex}`,
     label: `Day ${dayIndex + 1}`,
+    sublabel: day.dayName || "",
     entries: day.lifts.map((lift, liftIndex) => ({
       dayIndex,
       liftIndex,
@@ -1133,8 +1240,14 @@ function ProgramBuilderBody({
                 aria-selected={index === safeActive}
                 className={`builder-segment-tab ${index === safeActive ? "is-active" : ""}`}
                 onClick={() => setActiveSegment(index)}
+                title={seg.sublabel || seg.label}
               >
-                {seg.label}
+                <span className="builder-segment-tab-label">
+                  {seg.label}
+                  {seg.sublabel ? (
+                    <span className="builder-segment-tab-sublabel">{seg.sublabel}</span>
+                  ) : null}
+                </span>
                 <span className="builder-segment-tab-count">{seg.entries.length}</span>
               </button>
             ))
@@ -1181,6 +1294,20 @@ function ProgramBuilderBody({
 function DayHeader({ day, dayIndex, onUpdateDay }) {
   return (
     <div className="builder-day-header">
+      <label className="field builder-day-name-field">
+        <span>Day name</span>
+        <input
+          type="text"
+          value={day.dayName || ""}
+          onChange={(event) =>
+            onUpdateDay(dayIndex, (current) => ({
+              ...current,
+              dayName: event.target.value
+            }))
+          }
+          placeholder="e.g. Lower A: Squat + Land"
+        />
+      </label>
       <label className="field compact-field">
         <span>Week position</span>
         <select
@@ -1287,6 +1414,14 @@ function LiftTable({
                       <option key={l.id} value={l.name} />
                     ))}
                   </datalist>
+                  {lift.pairedWith ? (
+                    <span className="lift-table-pair-badge" title={`Superset with ${lift.pairedWith}`}>
+                      ↔ {lift.pairedWith}
+                    </span>
+                  ) : null}
+                  {lift.tempo ? (
+                    <span className="lift-table-tempo">Tempo: {lift.tempo}</span>
+                  ) : null}
                   {willCreate ? (
                     <span className="muted-copy compact-copy lift-table-newlift-hint">
                       New library lift on save
@@ -1295,21 +1430,21 @@ function LiftTable({
                 </td>
                 <td>
                   <input
-                    type="number"
-                    min="1"
+                    type="text"
                     className="lift-table-input lift-table-num"
                     value={lift.sets}
                     onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "sets", e.target.value)}
+                    placeholder="3"
                     required
                   />
                 </td>
                 <td>
                   <input
-                    type="number"
-                    min="1"
+                    type="text"
                     className="lift-table-input lift-table-num"
                     value={lift.reps}
                     onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "reps", e.target.value)}
+                    placeholder="5"
                     required
                   />
                 </td>

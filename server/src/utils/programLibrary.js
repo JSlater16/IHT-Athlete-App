@@ -2,8 +2,7 @@ const path = require("path");
 const fs = require("fs/promises");
 const {
   standardProgramVariant,
-  eccentricProgramVariants,
-  allowedProgramVariants
+  eccentricProgramVariants
 } = require("./programVariant");
 
 const LIBRARY_FILE = path.resolve(__dirname, "..", "..", "data", "programLibrary.json");
@@ -81,18 +80,17 @@ function validateProgramLibrary(library) {
       return "Every program must include id, name, and phase.";
     }
 
-    const variant = program.variant || standardProgramVariant;
+    const variant = (program.variant || standardProgramVariant).toString().trim();
 
-    if (!allowedProgramVariants.has(variant)) {
-      return "Every program variant must be Standard, Alactic Eccentrics, or Lactic Eccentrics.";
+    if (!variant) {
+      return "Every program needs a variant.";
     }
 
+    // Eccentrics still requires one of the two named variants. All
+    // other phases accept any free-form variant string so coaches can
+    // label tracks like "Base" / "Advanced" / "Returning Athlete".
     if (program.phase === "Eccentrics" && !eccentricProgramVariants.includes(variant)) {
       return "Eccentrics programs must use Alactic Eccentrics or Lactic Eccentrics as the variant.";
-    }
-
-    if (program.phase !== "Eccentrics" && variant !== standardProgramVariant) {
-      return "Only Eccentrics programs can use a non-Standard variant.";
     }
 
     if (!allowedFrequencies.has(Number(program.frequency))) {
