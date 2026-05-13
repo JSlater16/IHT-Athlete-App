@@ -1,19 +1,50 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
 import ConfirmModal from "../../components/ConfirmModal";
 
 const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"];
+const allFrequencies = [3, 4, 5];
 const standardProgramVariant = "Standard";
 const eccentricProgramVariants = ["Alactic Eccentrics", "Lactic Eccentrics"];
 const workoutPlacementOptions = ["Prep", "Block 1", "Block 2", "Block 3", "Block 4"];
 const customExerciseCategory = "Custom";
 
-function countProgramLifts(program) {
-  return (program.days || []).reduce((total, day) => total + (day.lifts || []).length, 0);
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
-function createExerciseForm() {
+function familyKey(program) {
+  return `${program.name}|${program.phase}|${program.variant || standardProgramVariant}`;
+}
+
+function groupProgramFamilies(programs) {
+  const map = new Map();
+  for (const p of programs) {
+    const key = familyKey(p);
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        name: p.name,
+        phase: p.phase,
+        variant: p.variant || standardProgramVariant,
+        byFrequency: new Map()
+      });
+    }
+    map.get(key).byFrequency.set(Number(p.frequency), p);
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.phase !== b.phase) return phaseOptions.indexOf(a.phase) - phaseOptions.indexOf(b.phase);
+    if (a.variant !== b.variant) return a.variant.localeCompare(b.variant);
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function phaseClass(phase) {
+  return `phase-${phase ? phase.toLowerCase() : "default"}`;
+}
+
+function createLiftForm() {
   return {
     name: "",
     category: "",
@@ -21,6 +52,17 @@ function createExerciseForm() {
     defaultReps: "5",
     defaultWeight: "Bodyweight",
     defaultNotes: ""
+  };
+}
+
+function liftToForm(lift) {
+  return {
+    name: lift.name || "",
+    category: lift.category || "",
+    defaultSets: String(lift.defaultSets ?? "3"),
+    defaultReps: String(lift.defaultReps ?? "5"),
+    defaultWeight: lift.defaultWeight || "",
+    defaultNotes: lift.defaultNotes || ""
   };
 }
 
@@ -41,23 +83,20 @@ function createProgramDay(dayOffset = 0) {
 }
 
 function createDaysForFrequency(frequency) {
-  return Array.from({ length: Number(frequency) }, (_, index) => createProgramDay(index));
+  return Array.from({ length: Number(frequency) }, (_, i) => createProgramDay(i));
 }
 
-function createProgramForm() {
+function createProgramForm(seed = {}) {
   return {
-    name: "",
-    phase: "Prep",
-    variant: standardProgramVariant,
-    frequency: 3,
-    days: createDaysForFrequency(3)
+    name: seed.name || "",
+    phase: seed.phase || "Prep",
+    variant: seed.variant || standardProgramVariant,
+    frequency: Number(seed.frequency) || 3,
+    days: seed.days || createDaysForFrequency(Number(seed.frequency) || 3)
   };
 }
 
 function programToForm(program) {
-  // Convert a stored program to editable form state. We keep numeric
-  // fields as strings here so the <input type="number"> components
-  // behave correctly (no NaN from empty intermediate states).
   return {
     name: program.name || "",
     phase: program.phase || "Prep",
@@ -82,34 +121,40 @@ function getVariantOptions(phase) {
   return phase === "Eccentrics" ? eccentricProgramVariants : [standardProgramVariant];
 }
 
-function normalizeExerciseName(value) {
-  return String(value || "").trim().toLowerCase();
+function summarizeLiftDefault(lift) {
+  return `${lift.defaultSets}×${lift.defaultReps} • ${lift.defaultWeight}`;
 }
 
 export default function CoachWorkoutsPage() {
   const { token } = useAuth();
   const [library, setLibrary] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
 
-  const [isExerciseModalOpen, setIsExerciseModalOpen] = useState(false);
-  const [exerciseForm, setExerciseForm] = useState(createExerciseForm());
-  const [exerciseError, setExerciseError] = useState("");
-  const [exerciseSubmitting, setExerciseSubmitting] = useState(false);
+  const [programSearch, setProgramSearch] = useState("");
+  const [liftSearch, setLiftSearch] = useState("");
 
-  // Unified program modal state. mode: "create" | "edit"; programId is
-  // set only in edit mode (for the PUT path).
+  // Lift modal (create or edit a single library lift)
+  const [liftModal, setLiftModal] = useState({ open: false, mode: "create", liftId: null });
+  const [liftForm, setLiftForm] = useState(createLiftForm());
+  const [liftFormError, setLiftFormError] = useState("");
+  const [liftSubmitting, setLiftSubmitting] = useState(false);
+  const [pendingLiftDelete, setPendingLiftDelete] = useState(null);
+  const [liftDeleting, setLiftDeleting] = useState(false);
+
+  // Program modal
   const [programModal, setProgramModal] = useState({ open: false, mode: "create", programId: null });
   const [programForm, setProgramForm] = useState(createProgramForm());
   const [programError, setProgramError] = useState("");
   const [programSubmitting, setProgramSubmitting] = useState(false);
-  const [editorView, setEditorView] = useState("days"); // "days" | "blocks"
-
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Builder navigation
+  const [editorView, setEditorView] = useState("days"); // "days" | "blocks"
+  const [activeSegment, setActiveSegment] = useState(0); // active day index OR active block index
+  const focusNextRowRef = useRef(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -129,70 +174,147 @@ export default function CoachWorkoutsPage() {
     try {
       const data = await apiRequest("/api/program-library", { token, signal });
       setLibrary(data?.library || null);
-      setSummary(data?.summary || null);
-    } catch (loadError) {
-      if (loadError.name === "AbortError") return;
-      setError(loadError.message);
+    } catch (e) {
+      if (e.name === "AbortError") return;
+      setError(e.message);
     } finally {
       if (!signal || !signal.aborted) setLoading(false);
     }
   }
 
   const liftNameById = useMemo(
-    () => new Map((library?.liftLibrary || []).map((lift) => [lift.id, lift.name])),
+    () => new Map((library?.liftLibrary || []).map((l) => [l.id, l.name])),
     [library]
   );
 
   const liftByNormalizedName = useMemo(
-    () => new Map((library?.liftLibrary || []).map((lift) => [normalizeExerciseName(lift.name), lift])),
+    () => new Map((library?.liftLibrary || []).map((l) => [normalizeText(l.name), l])),
     [library]
   );
 
   const filteredPrograms = useMemo(() => {
     const programs = library?.programs || [];
-    const query = search.trim().toLowerCase();
-    if (!query) return programs;
+    const q = programSearch.trim().toLowerCase();
+    if (!q) return programs;
     return programs.filter((program) => {
       const dayText = (program.days || [])
-        .flatMap((day) => day.lifts || [])
-        .map((lift) => lift.exerciseName || liftNameById.get(lift.liftId) || lift.liftId)
+        .flatMap((d) => d.lifts || [])
+        .map((l) => l.exerciseName || liftNameById.get(l.liftId) || l.liftId)
         .join(" ")
         .toLowerCase();
-      return [program.name, program.phase, program.variant, `${program.frequency} day`, dayText]
+      return [program.name, program.phase, program.variant, dayText]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(query);
+        .includes(q);
     });
-  }, [library, liftNameById, search]);
+  }, [library, liftNameById, programSearch]);
 
-  const groupedPrograms = useMemo(() => {
-    const groups = new Map();
-    for (const program of filteredPrograms) {
-      if (!groups.has(program.phase)) groups.set(program.phase, []);
-      groups.get(program.phase).push(program);
-    }
-    return Array.from(groups.entries()).map(([phase, programs]) => ({
-      phase,
-      programs: [...programs].sort((left, right) => {
-        if (left.variant !== right.variant) {
-          return String(left.variant || "").localeCompare(String(right.variant || ""));
-        }
-        return Number(left.frequency) - Number(right.frequency);
-      })
-    }));
-  }, [filteredPrograms]);
+  const families = useMemo(() => groupProgramFamilies(filteredPrograms), [filteredPrograms]);
 
-  function closeExerciseModal() {
-    setIsExerciseModalOpen(false);
-    setExerciseForm(createExerciseForm());
-    setExerciseError("");
+  const filteredLifts = useMemo(() => {
+    const lifts = library?.liftLibrary || [];
+    const q = liftSearch.trim().toLowerCase();
+    const list = q
+      ? lifts.filter((l) =>
+          [l.name, l.category, l.defaultWeight, l.defaultNotes]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(q)
+        )
+      : lifts;
+    return list.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }, [library, liftSearch]);
+
+  // ------- Lift modal handlers -------
+
+  function openLiftCreate() {
+    setLiftForm(createLiftForm());
+    setLiftFormError("");
+    setLiftModal({ open: true, mode: "create", liftId: null });
   }
 
-  function openProgramCreate() {
-    setProgramForm(createProgramForm());
+  function openLiftEdit(lift) {
+    setLiftForm(liftToForm(lift));
+    setLiftFormError("");
+    setLiftModal({ open: true, mode: "edit", liftId: lift.id });
+  }
+
+  function closeLiftModal() {
+    setLiftModal({ open: false, mode: "create", liftId: null });
+    setLiftForm(createLiftForm());
+    setLiftFormError("");
+  }
+
+  async function handleSaveLift(event) {
+    event.preventDefault();
+    setLiftFormError("");
+
+    if (!liftForm.name.trim()) return setLiftFormError("Lift name is required.");
+    if (!liftForm.category.trim()) return setLiftFormError("Category is required.");
+    if (Number(liftForm.defaultSets) < 1 || Number(liftForm.defaultReps) < 1) {
+      return setLiftFormError("Sets and reps must be at least 1.");
+    }
+    if (!liftForm.defaultWeight.trim()) return setLiftFormError("Default weight is required.");
+
+    setLiftSubmitting(true);
+    try {
+      const body = {
+        name: liftForm.name.trim(),
+        category: liftForm.category.trim(),
+        defaultSets: Number(liftForm.defaultSets),
+        defaultReps: Number(liftForm.defaultReps),
+        defaultWeight: liftForm.defaultWeight.trim(),
+        defaultNotes: liftForm.defaultNotes.trim()
+      };
+      const isEdit = liftModal.mode === "edit";
+      const data = await apiRequest(
+        isEdit ? `/api/program-library/lifts/${liftModal.liftId}` : "/api/program-library/lifts",
+        { method: isEdit ? "PUT" : "POST", token, body }
+      );
+      if (!data?.library) throw new Error("Unexpected response from server.");
+      setLibrary(data.library);
+      closeLiftModal();
+      setToast(isEdit ? "Lift updated." : "Lift added.");
+    } catch (e) {
+      setLiftFormError(e.message);
+    } finally {
+      setLiftSubmitting(false);
+    }
+  }
+
+  function requestLiftDelete(lift) {
+    setPendingLiftDelete({ id: lift.id, name: lift.name });
+  }
+
+  async function confirmLiftDelete() {
+    if (!pendingLiftDelete) return;
+    setLiftDeleting(true);
+    try {
+      const data = await apiRequest(`/api/program-library/lifts/${pendingLiftDelete.id}`, {
+        method: "DELETE",
+        token
+      });
+      if (data?.library) setLibrary(data.library);
+      else await loadLibrary();
+      setPendingLiftDelete(null);
+      setToast("Lift removed.");
+    } catch (e) {
+      setLiftFormError(e.message);
+      setPendingLiftDelete(null);
+    } finally {
+      setLiftDeleting(false);
+    }
+  }
+
+  // ------- Program modal handlers -------
+
+  function openProgramCreate(seed = {}) {
+    setProgramForm(createProgramForm(seed));
     setProgramError("");
     setEditorView("days");
+    setActiveSegment(0);
     setProgramModal({ open: true, mode: "create", programId: null });
   }
 
@@ -200,6 +322,7 @@ export default function CoachWorkoutsPage() {
     setProgramForm(programToForm(program));
     setProgramError("");
     setEditorView("days");
+    setActiveSegment(0);
     setProgramModal({ open: true, mode: "edit", programId: program.id });
   }
 
@@ -209,113 +332,82 @@ export default function CoachWorkoutsPage() {
     setProgramError("");
   }
 
-  async function handleCreateExercise(event) {
-    event.preventDefault();
-    setExerciseError("");
-
-    if (!exerciseForm.name.trim()) return setExerciseError("Exercise name is required.");
-    if (!exerciseForm.category.trim()) return setExerciseError("Category is required.");
-    if (Number(exerciseForm.defaultSets) < 1 || Number(exerciseForm.defaultReps) < 1) {
-      return setExerciseError("Sets and reps must be at least 1.");
-    }
-    if (!exerciseForm.defaultWeight.trim()) return setExerciseError("Default weight is required.");
-
-    setExerciseSubmitting(true);
-    try {
-      const data = await apiRequest("/api/program-library/lifts", {
-        method: "POST",
-        token,
-        body: {
-          name: exerciseForm.name.trim(),
-          category: exerciseForm.category.trim(),
-          defaultSets: Number(exerciseForm.defaultSets),
-          defaultReps: Number(exerciseForm.defaultReps),
-          defaultWeight: exerciseForm.defaultWeight.trim(),
-          defaultNotes: exerciseForm.defaultNotes.trim()
-        }
+  function openFamilyFrequency(family, frequency) {
+    const existing = family.byFrequency.get(frequency);
+    if (existing) {
+      openProgramEdit(existing);
+    } else {
+      // Create a new program in the same family, prefilled.
+      openProgramCreate({
+        name: family.name,
+        phase: family.phase,
+        variant: family.variant,
+        frequency
       });
-      if (!data?.library) throw new Error("Unexpected response from server.");
-      setLibrary(data.library);
-      setSummary(data.summary);
-      closeExerciseModal();
-      setToast("Exercise created.");
-    } catch (submitError) {
-      setExerciseError(submitError.message);
-    } finally {
-      setExerciseSubmitting(false);
     }
   }
 
   function updateProgramDay(dayIndex, updater) {
-    setProgramForm((current) => ({
-      ...current,
-      days: current.days.map((day, index) => (index === dayIndex ? updater(day) : day))
+    setProgramForm((cur) => ({
+      ...cur,
+      days: cur.days.map((d, i) => (i === dayIndex ? updater(d) : d))
     }));
   }
 
   function handleFrequencyChange(value) {
     const nextFrequency = Number(value);
-    setProgramForm((current) => {
+    setProgramForm((cur) => {
       const nextDays = createDaysForFrequency(nextFrequency).map((defaultDay, index) => {
-        const existingDay = current.days[index];
-        return existingDay
-          ? {
-              ...existingDay,
-              dayOffset: Number.isFinite(Number(existingDay.dayOffset))
-                ? Number(existingDay.dayOffset)
-                : index
-            }
+        const existing = cur.days[index];
+        return existing
+          ? { ...existing, dayOffset: Number.isFinite(Number(existing.dayOffset)) ? Number(existing.dayOffset) : index }
           : defaultDay;
       });
-      return { ...current, frequency: nextFrequency, days: nextDays };
+      return { ...cur, frequency: nextFrequency, days: nextDays };
     });
+    setActiveSegment(0);
   }
 
   function handleProgramPhaseChange(value) {
-    setProgramForm((current) => ({
-      ...current,
+    setProgramForm((cur) => ({
+      ...cur,
       phase: value,
       variant: value === "Eccentrics" ? eccentricProgramVariants[0] : standardProgramVariant
     }));
   }
 
   function addProgramLift(dayIndex) {
-    updateProgramDay(dayIndex, (day) => ({ ...day, lifts: [...day.lifts, createProgramLiftRow()] }));
+    focusNextRowRef.current = { dayIndex };
+    updateProgramDay(dayIndex, (d) => ({ ...d, lifts: [...d.lifts, createProgramLiftRow()] }));
   }
 
   function removeProgramLift(dayIndex, liftIndex) {
-    updateProgramDay(dayIndex, (day) => ({
-      ...day,
-      lifts: day.lifts.filter((_, index) => index !== liftIndex)
+    updateProgramDay(dayIndex, (d) => ({
+      ...d,
+      lifts: d.lifts.filter((_, i) => i !== liftIndex)
     }));
   }
 
   function moveProgramLift(dayIndex, liftIndex, direction) {
-    updateProgramDay(dayIndex, (day) => {
+    updateProgramDay(dayIndex, (d) => {
       const target = liftIndex + direction;
-      if (target < 0 || target >= day.lifts.length) return day;
-      const nextLifts = day.lifts.slice();
+      if (target < 0 || target >= d.lifts.length) return d;
+      const nextLifts = d.lifts.slice();
       [nextLifts[liftIndex], nextLifts[target]] = [nextLifts[target], nextLifts[liftIndex]];
-      return { ...day, lifts: nextLifts };
+      return { ...d, lifts: nextLifts };
     });
   }
 
   function updateProgramLiftField(dayIndex, liftIndex, field, value) {
-    updateProgramDay(dayIndex, (day) => ({
-      ...day,
-      lifts: day.lifts.map((lift, index) => {
-        if (index !== liftIndex) return lift;
-
+    updateProgramDay(dayIndex, (d) => ({
+      ...d,
+      lifts: d.lifts.map((l, i) => {
+        if (i !== liftIndex) return l;
         if (field === "exerciseName") {
-          const matched = liftByNormalizedName.get(normalizeExerciseName(value));
-          return {
-            ...lift,
-            exerciseName: value,
-            liftId: matched?.id || ""
-          };
+          const matched = liftByNormalizedName.get(normalizeText(value));
+          return { ...l, exerciseName: value, liftId: matched?.id || "" };
         }
-
-        return { ...lift, [field]: value };
+        return { ...l, [field]: value };
       })
     }));
   }
@@ -330,7 +422,7 @@ export default function CoachWorkoutsPage() {
         dayOffset: Number(day.dayOffset),
         lifts: day.lifts.map((lift) => {
           const trimmedName = lift.exerciseName.trim();
-          const matched = liftByNormalizedName.get(normalizeExerciseName(trimmedName));
+          const matched = liftByNormalizedName.get(normalizeText(trimmedName));
           const liftId = matched?.id || lift.liftId || "";
           const entry = {
             liftId,
@@ -341,8 +433,6 @@ export default function CoachWorkoutsPage() {
             weight: lift.weight.trim(),
             notes: lift.notes.trim()
           };
-          // No match in library → ask the server to create the lift
-          // atomically as part of this save.
           if (!liftId) {
             entry.newLift = {
               name: trimmedName,
@@ -367,13 +457,13 @@ export default function CoachWorkoutsPage() {
       for (let liftIndex = 0; liftIndex < day.lifts.length; liftIndex += 1) {
         const lift = day.lifts[liftIndex];
         if (!lift.exerciseName.trim()) {
-          return `Enter an exercise for Day ${dayIndex + 1}, lift ${liftIndex + 1}.`;
+          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: exercise name is required.`;
         }
         if (Number(lift.sets) < 1 || Number(lift.reps) < 1) {
-          return `Day ${dayIndex + 1}, lift ${liftIndex + 1} needs valid sets and reps.`;
+          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: sets and reps must be at least 1.`;
         }
         if (!lift.weight.trim()) {
-          return `Day ${dayIndex + 1}, lift ${liftIndex + 1} needs a weight value.`;
+          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: weight is required.`;
         }
       }
     }
@@ -383,13 +473,11 @@ export default function CoachWorkoutsPage() {
   async function handleSaveProgram(event) {
     event.preventDefault();
     setProgramError("");
-
     const validationError = validateProgramForm();
     if (validationError) {
       setProgramError(validationError);
       return;
     }
-
     setProgramSubmitting(true);
     try {
       const body = buildProgramBody();
@@ -402,21 +490,20 @@ export default function CoachWorkoutsPage() {
       );
       if (!data?.library) throw new Error("Unexpected response from server.");
       setLibrary(data.library);
-      setSummary(data.summary);
       closeProgramModal();
-      setToast(isEdit ? "Program updated." : "Program created.");
-    } catch (submitError) {
-      setProgramError(submitError.message);
+      setToast(isEdit ? "Program saved." : "Program created.");
+    } catch (e) {
+      setProgramError(e.message);
     } finally {
       setProgramSubmitting(false);
     }
   }
 
-  function requestDelete(program) {
+  function requestProgramDelete(program) {
     setPendingDelete({ id: program.id, name: program.name });
   }
 
-  async function confirmDelete() {
+  async function confirmProgramDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
     try {
@@ -424,25 +511,18 @@ export default function CoachWorkoutsPage() {
         method: "DELETE",
         token
       });
-      if (data?.library) {
-        setLibrary(data.library);
-        setSummary(data.summary);
-      } else {
-        // Server returned 204 or empty — reload as a fallback.
-        await loadLibrary();
-      }
+      if (data?.library) setLibrary(data.library);
+      else await loadLibrary();
       setPendingDelete(null);
       setToast("Program deleted.");
-    } catch (delError) {
-      setError(delError.message);
+    } catch (e) {
+      setError(e.message);
     } finally {
       setDeleting(false);
     }
   }
 
-  const modalTitle = programModal.mode === "edit" ? "Edit program" : "Create program";
-  const modalSubmitLabel = programModal.mode === "edit" ? "Save program" : "Create program";
-  const modalSavingLabel = programModal.mode === "edit" ? "Saving..." : "Creating...";
+  // ------- Render -------
 
   return (
     <div className="coach-page-stack">
@@ -452,14 +532,9 @@ export default function CoachWorkoutsPage() {
         <div>
           <p className="eyebrow">Workouts</p>
           <h2>Program library</h2>
-          <p className="muted-copy">Browse, edit, and build training programs by phase and frequency.</p>
         </div>
-
         <div className="header-action-row">
-          <button className="ghost-button" type="button" onClick={() => setIsExerciseModalOpen(true)}>
-            New exercise
-          </button>
-          <button className="primary-button" type="button" onClick={openProgramCreate}>
+          <button className="primary-button" type="button" onClick={() => openProgramCreate()}>
             New program
           </button>
         </div>
@@ -470,299 +545,141 @@ export default function CoachWorkoutsPage() {
           <input
             className="search-input"
             type="search"
-            placeholder="Search by phase, variant, frequency, or lift"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search programs"
+            value={programSearch}
+            onChange={(event) => setProgramSearch(event.target.value)}
           />
         </div>
-
-        {summary ? (
-          <div className="program-summary-grid">
-            <span className="metric-chip">{summary.programCount} programs</span>
-            <span className="metric-chip">{summary.liftCount} library lifts</span>
-            <span className="metric-chip">{summary.phases.join(", ")}</span>
-            <span className="metric-chip">Frequencies: {summary.frequencies.join(", ")}</span>
-          </div>
-        ) : null}
 
         {loading ? <p className="empty-state">Loading workouts...</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
 
-        {!loading && !error && groupedPrograms.length === 0 ? (
-          <p className="empty-state">No programs match that search.</p>
+        {!loading && !error && families.length === 0 ? (
+          <p className="empty-state">
+            {programSearch ? "No programs match that search." : "No programs yet. Click New program to start."}
+          </p>
         ) : null}
 
-        {!loading && !error ? (
-          <div className="workout-library-stack">
-            {groupedPrograms.map((group) => (
-              <section key={group.phase} className="lift-block-group">
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Phase</p>
-                    <h3>{group.phase}</h3>
-                  </div>
-                  <span className="phase-badge">{group.programs.length} templates</span>
-                </div>
-
-                <div className="coach-library-grid">
-                  {group.programs.map((program) => (
-                    <article key={program.id} className="coach-library-card">
-                      <header className="coach-workout-summary">
-                        <div>
-                          <h3>{program.name}</h3>
-                          <p className="muted-copy compact-copy">
-                            {program.variant || "Standard"} • {program.frequency} days per week
-                          </p>
-                        </div>
-                        <div className="coach-workout-summary-meta">
-                          <span className="status-badge">{countProgramLifts(program)} lifts</span>
-                        </div>
-                      </header>
-
-                      <details className="coach-workout-details">
-                        <summary className="inline-link-button">View days</summary>
-                        <div className="library-day-stack">
-                          {(program.days || []).map((day, index) => (
-                            <div key={`${program.id}-${day.dayOffset}-${index}`} className="library-day-card">
-                              <div className="section-heading">
-                                <strong>Day {index + 1}</strong>
-                                <span className="muted-copy">Offset {day.dayOffset}</span>
-                              </div>
-                              <ul className="library-lift-list">
-                                {(day.lifts || []).map((lift, liftIndex) => (
-                                  <li key={`${program.id}-${day.dayOffset}-${lift.liftId}-${liftIndex}`}>
-                                    {lift.exerciseName || liftNameById.get(lift.liftId) || lift.liftId}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-
-                      <div className="card-actions">
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          onClick={() => requestDelete(program)}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          className="primary-button"
-                          type="button"
-                          onClick={() => openProgramEdit(program)}
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
+        {!loading && !error && families.length > 0 ? (
+          <div className="program-family-grid">
+            {families.map((family) => (
+              <ProgramFamilyCard
+                key={family.key}
+                family={family}
+                onOpenFrequency={openFamilyFrequency}
+              />
             ))}
           </div>
         ) : null}
       </section>
 
-      {isExerciseModalOpen ? (
-        <div className="modal-backdrop" role="presentation" onClick={closeExerciseModal}>
-          <div className="modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Workout Library</p>
-                <h2>Create exercise</h2>
-              </div>
-              <button className="ghost-button" type="button" onClick={closeExerciseModal}>
-                Close
-              </button>
-            </div>
-
-            <form className="form-grid" onSubmit={handleCreateExercise}>
-              <label className="field">
-                <span>Exercise name</span>
-                <input
-                  type="text"
-                  value={exerciseForm.name}
-                  onChange={(event) => setExerciseForm((current) => ({ ...current, name: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="field">
-                <span>Category</span>
-                <input
-                  type="text"
-                  value={exerciseForm.category}
-                  onChange={(event) =>
-                    setExerciseForm((current) => ({ ...current, category: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <div className="inline-fields three-up">
-                <label className="field">
-                  <span>Default sets</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={exerciseForm.defaultSets}
-                    onChange={(event) =>
-                      setExerciseForm((current) => ({ ...current, defaultSets: event.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Default reps</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={exerciseForm.defaultReps}
-                    onChange={(event) =>
-                      setExerciseForm((current) => ({ ...current, defaultReps: event.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Default weight</span>
-                  <input
-                    type="text"
-                    value={exerciseForm.defaultWeight}
-                    onChange={(event) =>
-                      setExerciseForm((current) => ({ ...current, defaultWeight: event.target.value }))
-                    }
-                    required
-                  />
-                </label>
-              </div>
-
-              <label className="field">
-                <span>Default notes</span>
-                <textarea
-                  rows="4"
-                  value={exerciseForm.defaultNotes}
-                  onChange={(event) =>
-                    setExerciseForm((current) => ({ ...current, defaultNotes: event.target.value }))
-                  }
-                />
-              </label>
-
-              {exerciseError ? <p className="form-error">{exerciseError}</p> : null}
-
-              <div className="modal-actions">
-                <button className="ghost-button" type="button" onClick={closeExerciseModal}>
-                  Cancel
-                </button>
-                <button className="primary-button" type="submit" disabled={exerciseSubmitting}>
-                  {exerciseSubmitting ? "Creating..." : "Create exercise"}
-                </button>
-              </div>
-            </form>
+      <section className="dashboard-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Misc.</p>
+            <h2>Lift library</h2>
+            <p className="muted-copy compact-copy">
+              Individual lifts you can drop into any program — one-offs, accessories, custom variations.
+            </p>
           </div>
+          <button className="primary-button" type="button" onClick={openLiftCreate}>
+            New lift
+          </button>
         </div>
+
+        <div className="toolbar">
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search lifts"
+            value={liftSearch}
+            onChange={(event) => setLiftSearch(event.target.value)}
+          />
+        </div>
+
+        {filteredLifts.length === 0 ? (
+          <p className="empty-state">
+            {liftSearch ? "No lifts match that search." : "No lifts in the library yet."}
+          </p>
+        ) : (
+          <ul className="misc-lift-list">
+            {filteredLifts.map((lift) => (
+              <li key={lift.id} className="misc-lift-row">
+                <div className="misc-lift-main">
+                  <strong>{lift.name}</strong>
+                  <span className="muted-copy compact-copy">{lift.category}</span>
+                </div>
+                <span className="muted-copy compact-copy misc-lift-default">
+                  {summarizeLiftDefault(lift)}
+                </span>
+                <div className="misc-lift-actions">
+                  <button className="ghost-button" type="button" onClick={() => openLiftEdit(lift)}>
+                    Edit
+                  </button>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => requestLiftDelete(lift)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {liftModal.open ? (
+        <LiftFormModal
+          mode={liftModal.mode}
+          form={liftForm}
+          onChange={setLiftForm}
+          onSubmit={handleSaveLift}
+          onClose={closeLiftModal}
+          error={liftFormError}
+          submitting={liftSubmitting}
+        />
       ) : null}
 
       {programModal.open ? (
-        <div className="modal-backdrop" role="presentation" onClick={closeProgramModal}>
-          <div
-            className="modal-card modal-card-wide"
-            role="dialog"
-            aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Workout Library</p>
-                <h2>{modalTitle}</h2>
-              </div>
-              <button className="ghost-button" type="button" onClick={closeProgramModal}>
-                Close
-              </button>
-            </div>
-
-            <form className="form-grid" onSubmit={handleSaveProgram}>
-              <label className="field">
-                <span>Program name</span>
-                <input
-                  type="text"
-                  value={programForm.name}
-                  onChange={(event) => setProgramForm((current) => ({ ...current, name: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <div className="inline-fields three-up">
-                <label className="field">
-                  <span>Phase</span>
-                  <select
-                    value={programForm.phase}
-                    onChange={(event) => handleProgramPhaseChange(event.target.value)}
-                  >
-                    {phaseOptions.map((phase) => (
-                      <option key={phase} value={phase}>{phase}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>Program type</span>
-                  <select
-                    value={programForm.variant}
-                    onChange={(event) =>
-                      setProgramForm((current) => ({ ...current, variant: event.target.value }))
-                    }
-                    disabled={programForm.phase !== "Eccentrics"}
-                  >
-                    {getVariantOptions(programForm.phase).map((variant) => (
-                      <option key={variant} value={variant}>{variant}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>Frequency</span>
-                  <select
-                    value={programForm.frequency}
-                    onChange={(event) => handleFrequencyChange(event.target.value)}
-                  >
-                    <option value={3}>3 days</option>
-                    <option value={4}>4 days</option>
-                    <option value={5}>5 days</option>
-                  </select>
-                </label>
-              </div>
-
-              <ProgramEditorBody
-                programForm={programForm}
-                editorView={editorView}
-                setEditorView={setEditorView}
-                library={library}
-                liftByNormalizedName={liftByNormalizedName}
-                updateProgramDay={updateProgramDay}
-                updateProgramLiftField={updateProgramLiftField}
-                addProgramLift={addProgramLift}
-                removeProgramLift={removeProgramLift}
-                moveProgramLift={moveProgramLift}
-              />
-
-              {programError ? <p className="form-error">{programError}</p> : null}
-
-              <div className="modal-actions">
-                <button className="ghost-button" type="button" onClick={closeProgramModal}>
-                  Cancel
-                </button>
-                <button className="primary-button" type="submit" disabled={programSubmitting}>
-                  {programSubmitting ? modalSavingLabel : modalSubmitLabel}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ProgramFormModal
+          mode={programModal.mode}
+          form={programForm}
+          editorView={editorView}
+          setEditorView={(v) => {
+            setEditorView(v);
+            setActiveSegment(0);
+          }}
+          activeSegment={activeSegment}
+          setActiveSegment={setActiveSegment}
+          library={library}
+          liftByNormalizedName={liftByNormalizedName}
+          onFieldChange={(field, value) =>
+            setProgramForm((cur) => ({ ...cur, [field]: value }))
+          }
+          onPhaseChange={handleProgramPhaseChange}
+          onFrequencyChange={handleFrequencyChange}
+          onUpdateDay={updateProgramDay}
+          onUpdateLiftField={updateProgramLiftField}
+          onAddLift={addProgramLift}
+          onRemoveLift={removeProgramLift}
+          onMoveLift={moveProgramLift}
+          onDelete={
+            programModal.mode === "edit"
+              ? () =>
+                  requestProgramDelete({
+                    id: programModal.programId,
+                    name: programForm.name
+                  })
+              : null
+          }
+          onSubmit={handleSaveProgram}
+          onClose={closeProgramModal}
+          error={programError}
+          submitting={programSubmitting}
+          focusNextRowRef={focusNextRowRef}
+        />
       ) : null}
 
       <ConfirmModal
@@ -770,349 +687,605 @@ export default function CoachWorkoutsPage() {
         title="Delete program"
         message={
           pendingDelete
-            ? `Delete "${pendingDelete.name}"? This removes it from the library — it won't change athletes whose week has already been applied.`
+            ? `Delete "${pendingDelete.name}"? Athletes whose week has already been applied won't change.`
             : ""
         }
         confirmLabel={deleting ? "Deleting..." : "Delete"}
         cancelLabel="Cancel"
         danger
-        onConfirm={confirmDelete}
+        onConfirm={confirmProgramDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <ConfirmModal
+        open={Boolean(pendingLiftDelete)}
+        title="Delete lift"
+        message={
+          pendingLiftDelete
+            ? `Remove "${pendingLiftDelete.name}" from the library? If any program still uses it the delete will be blocked.`
+            : ""
+        }
+        confirmLabel={liftDeleting ? "Removing..." : "Delete"}
+        cancelLabel="Cancel"
+        danger
+        onConfirm={confirmLiftDelete}
+        onCancel={() => setPendingLiftDelete(null)}
       />
     </div>
   );
 }
 
-// Wraps the day/block toggle and renders whichever view is active.
-// Lift cards are shared via LiftEditorCard so adding new fields only
-// happens in one place.
-function ProgramEditorBody({
-  programForm,
-  editorView,
-  setEditorView,
-  library,
-  liftByNormalizedName,
-  updateProgramDay,
-  updateProgramLiftField,
-  addProgramLift,
-  removeProgramLift,
-  moveProgramLift
-}) {
+// ------- Components -------
+
+function ProgramFamilyCard({ family, onOpenFrequency }) {
   return (
-    <div className="program-builder-stack">
-      <div className="program-builder-view-toggle" role="tablist" aria-label="Program editor view">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={editorView === "days"}
-          className={`tab-toggle ${editorView === "days" ? "is-active" : ""}`}
-          onClick={() => setEditorView("days")}
-        >
-          By day
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={editorView === "blocks"}
-          className={`tab-toggle ${editorView === "blocks" ? "is-active" : ""}`}
-          onClick={() => setEditorView("blocks")}
-        >
-          By block
-        </button>
-      </div>
-
-      {editorView === "days" ? (
-        <DaysView
-          programForm={programForm}
-          library={library}
-          liftByNormalizedName={liftByNormalizedName}
-          updateProgramDay={updateProgramDay}
-          updateProgramLiftField={updateProgramLiftField}
-          addProgramLift={addProgramLift}
-          removeProgramLift={removeProgramLift}
-          moveProgramLift={moveProgramLift}
-        />
-      ) : (
-        <BlocksView
-          programForm={programForm}
-          library={library}
-          liftByNormalizedName={liftByNormalizedName}
-          updateProgramLiftField={updateProgramLiftField}
-          removeProgramLift={removeProgramLift}
-          moveProgramLift={moveProgramLift}
-        />
-      )}
-    </div>
-  );
-}
-
-function DaysView({
-  programForm,
-  library,
-  liftByNormalizedName,
-  updateProgramDay,
-  updateProgramLiftField,
-  addProgramLift,
-  removeProgramLift,
-  moveProgramLift
-}) {
-  return (
-    <>
-      {programForm.days.map((day, dayIndex) => (
-        <section key={`program-day-${dayIndex}`} className="program-builder-card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Program Day</p>
-              <h3>Day {dayIndex + 1}</h3>
-            </div>
-            <label className="field compact-field">
-              <span>Week position</span>
-              <select
-                value={day.dayOffset}
-                onChange={(event) =>
-                  updateProgramDay(dayIndex, (currentDay) => ({
-                    ...currentDay,
-                    dayOffset: Number(event.target.value)
-                  }))
-                }
-              >
-                {Array.from({ length: 7 }, (_, index) => (
-                  <option key={index} value={index}>Day {index + 1}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="program-builder-lift-stack">
-            {day.lifts.map((lift, liftIndex) => (
-              <LiftEditorCard
-                key={`day-${dayIndex}-lift-${liftIndex}`}
-                lift={lift}
-                dayIndex={dayIndex}
-                liftIndex={liftIndex}
-                liftsInDay={day.lifts.length}
-                library={library}
-                liftByNormalizedName={liftByNormalizedName}
-                updateProgramLiftField={updateProgramLiftField}
-                removeProgramLift={removeProgramLift}
-                moveProgramLift={moveProgramLift}
-              />
-            ))}
-          </div>
-
-          <button className="ghost-button" type="button" onClick={() => addProgramLift(dayIndex)}>
-            Add exercise to day
-          </button>
-        </section>
-      ))}
-    </>
-  );
-}
-
-function BlocksView({
-  programForm,
-  library,
-  liftByNormalizedName,
-  updateProgramLiftField,
-  removeProgramLift,
-  moveProgramLift
-}) {
-  // Group all lifts (across all days) by blockLabel. Each entry keeps
-  // its dayIndex/liftIndex so edit handlers still target the right
-  // slot in the underlying days-array model.
-  const blocks = new Map();
-  for (const placement of workoutPlacementOptions) {
-    blocks.set(placement, []);
-  }
-  programForm.days.forEach((day, dayIndex) => {
-    day.lifts.forEach((lift, liftIndex) => {
-      const label = workoutPlacementOptions.includes(lift.blockLabel) ? lift.blockLabel : "Block 1";
-      blocks.get(label).push({ dayIndex, liftIndex, lift, liftsInDay: day.lifts.length });
-    });
-  });
-  const populatedBlocks = Array.from(blocks.entries()).filter(([, entries]) => entries.length > 0);
-
-  if (populatedBlocks.length === 0) {
-    return <p className="empty-state">No lifts yet. Switch to By day to start adding exercises.</p>;
-  }
-
-  return (
-    <>
-      {populatedBlocks.map(([blockLabel, entries]) => (
-        <section key={`block-${blockLabel}`} className="program-builder-card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Block</p>
-              <h3>{blockLabel}</h3>
-            </div>
-            <span className="muted-copy compact-copy">
-              {entries.length} exercise{entries.length === 1 ? "" : "s"}
-            </span>
-          </div>
-
-          <div className="program-builder-lift-stack">
-            {entries.map(({ dayIndex, liftIndex, lift, liftsInDay }) => (
-              <LiftEditorCard
-                key={`block-${blockLabel}-${dayIndex}-${liftIndex}`}
-                lift={lift}
-                dayIndex={dayIndex}
-                liftIndex={liftIndex}
-                liftsInDay={liftsInDay}
-                library={library}
-                liftByNormalizedName={liftByNormalizedName}
-                updateProgramLiftField={updateProgramLiftField}
-                removeProgramLift={removeProgramLift}
-                moveProgramLift={moveProgramLift}
-                dayLabel={`Day ${dayIndex + 1}`}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
-      <p className="muted-copy compact-copy">
-        Switch to By day to add new exercises. Reordering and editing work the same in both views.
-      </p>
-    </>
-  );
-}
-
-function LiftEditorCard({
-  lift,
-  dayIndex,
-  liftIndex,
-  liftsInDay,
-  library,
-  liftByNormalizedName,
-  updateProgramLiftField,
-  removeProgramLift,
-  moveProgramLift,
-  dayLabel
-}) {
-  const matchedLibrary = liftByNormalizedName.get(normalizeExerciseName(lift.exerciseName));
-  const willCreate = lift.exerciseName.trim() && !matchedLibrary;
-  const canMoveUp = liftIndex > 0;
-  const canMoveDown = liftIndex < liftsInDay - 1;
-
-  return (
-    <article className="program-builder-lift-card">
-      {dayLabel ? (
-        <div className="program-builder-lift-daytag">
-          <span className="status-badge">{dayLabel}</span>
+    <article className={`program-family-card ${phaseClass(family.phase)}`}>
+      <header className="program-family-card-header">
+        <div>
+          <h3 className="program-family-name">{family.name}</h3>
+          <p className="muted-copy compact-copy">
+            {family.phase}
+            {family.variant && family.variant !== standardProgramVariant ? ` · ${family.variant}` : ""}
+          </p>
         </div>
-      ) : null}
-
-      <div className="lift-editor-grid">
-        <label className="field">
-          <span>Exercise</span>
-          <input
-            list={`program-lifts-${dayIndex}-${liftIndex}`}
-            value={lift.exerciseName}
-            onChange={(event) =>
-              updateProgramLiftField(dayIndex, liftIndex, "exerciseName", event.target.value)
-            }
-            placeholder="Type or select exercise"
-            required
-          />
-          <datalist id={`program-lifts-${dayIndex}-${liftIndex}`}>
-            {(library?.liftLibrary || []).map((libraryLift) => (
-              <option key={libraryLift.id} value={libraryLift.name} />
-            ))}
-          </datalist>
-          {willCreate ? (
-            <span className="muted-copy compact-copy program-builder-newlift-hint">
-              New library exercise will be created on save.
-            </span>
-          ) : null}
-        </label>
-
-        <label className="field">
-          <span>Where in workout</span>
-          <select
-            value={lift.blockLabel}
-            onChange={(event) =>
-              updateProgramLiftField(dayIndex, liftIndex, "blockLabel", event.target.value)
-            }
-          >
-            {workoutPlacementOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span>Sets</span>
-          <input
-            type="number"
-            min="1"
-            value={lift.sets}
-            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "sets", event.target.value)}
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span>Reps</span>
-          <input
-            type="number"
-            min="1"
-            value={lift.reps}
-            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "reps", event.target.value)}
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span>Weight</span>
-          <input
-            type="text"
-            value={lift.weight}
-            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "weight", event.target.value)}
-            required
-          />
-        </label>
-
-        <label className="field field-full">
-          <span>Notes</span>
-          <textarea
-            rows="3"
-            value={lift.notes}
-            onChange={(event) => updateProgramLiftField(dayIndex, liftIndex, "notes", event.target.value)}
-          />
-        </label>
-      </div>
-
-      <div className="card-actions program-builder-lift-actions">
-        <div className="program-builder-lift-order">
-          <button
-            type="button"
-            className="ghost-button icon-button"
-            onClick={() => moveProgramLift(dayIndex, liftIndex, -1)}
-            disabled={!canMoveUp}
-            aria-label="Move exercise up"
-            title="Move up"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="ghost-button icon-button"
-            onClick={() => moveProgramLift(dayIndex, liftIndex, 1)}
-            disabled={!canMoveDown}
-            aria-label="Move exercise down"
-            title="Move down"
-          >
-            ↓
-          </button>
-        </div>
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => removeProgramLift(dayIndex, liftIndex)}
-          disabled={liftsInDay === 1}
-        >
-          Remove exercise
-        </button>
+      </header>
+      <div className="program-family-frequencies">
+        {allFrequencies.map((freq) => {
+          const exists = family.byFrequency.has(freq);
+          return (
+            <button
+              key={freq}
+              type="button"
+              className={`program-family-freq ${exists ? "is-existing" : "is-empty"}`}
+              onClick={() => onOpenFrequency(family, freq)}
+              title={exists ? `Edit ${freq}-day version` : `Create a ${freq}-day version`}
+            >
+              {exists ? `${freq} days` : `+ ${freq} days`}
+            </button>
+          );
+        })}
       </div>
     </article>
   );
 }
+
+function LiftFormModal({ mode, form, onChange, onSubmit, onClose, error, submitting }) {
+  const isEdit = mode === "edit";
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="modal-card"
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Lift library</p>
+            <h2>{isEdit ? "Edit lift" : "New lift"}</h2>
+          </div>
+          <button className="ghost-button" type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        <form className="form-grid" onSubmit={onSubmit}>
+          <label className="field">
+            <span>Lift name</span>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => onChange((cur) => ({ ...cur, name: e.target.value }))}
+              required
+              autoFocus
+            />
+          </label>
+
+          <label className="field">
+            <span>Category</span>
+            <input
+              type="text"
+              value={form.category}
+              onChange={(e) => onChange((cur) => ({ ...cur, category: e.target.value }))}
+              required
+            />
+          </label>
+
+          <div className="inline-fields three-up">
+            <label className="field">
+              <span>Default sets</span>
+              <input
+                type="number"
+                min="1"
+                value={form.defaultSets}
+                onChange={(e) => onChange((cur) => ({ ...cur, defaultSets: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Default reps</span>
+              <input
+                type="number"
+                min="1"
+                value={form.defaultReps}
+                onChange={(e) => onChange((cur) => ({ ...cur, defaultReps: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Default weight</span>
+              <input
+                type="text"
+                value={form.defaultWeight}
+                onChange={(e) => onChange((cur) => ({ ...cur, defaultWeight: e.target.value }))}
+                required
+              />
+            </label>
+          </div>
+
+          <label className="field">
+            <span>Default notes</span>
+            <textarea
+              rows="3"
+              value={form.defaultNotes}
+              onChange={(e) => onChange((cur) => ({ ...cur, defaultNotes: e.target.value }))}
+            />
+          </label>
+
+          {error ? <p className="form-error">{error}</p> : null}
+
+          <div className="modal-actions">
+            <button className="ghost-button" type="button" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="primary-button" type="submit" disabled={submitting}>
+              {submitting ? (isEdit ? "Saving..." : "Adding...") : isEdit ? "Save lift" : "Add lift"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ProgramFormModal(props) {
+  const {
+    mode,
+    form,
+    editorView,
+    setEditorView,
+    activeSegment,
+    setActiveSegment,
+    library,
+    liftByNormalizedName,
+    onFieldChange,
+    onPhaseChange,
+    onFrequencyChange,
+    onUpdateDay,
+    onUpdateLiftField,
+    onAddLift,
+    onRemoveLift,
+    onMoveLift,
+    onDelete,
+    onSubmit,
+    onClose,
+    error,
+    submitting,
+    focusNextRowRef
+  } = props;
+
+  const title = mode === "edit" ? "Edit program" : "New program";
+  const submitLabel = mode === "edit" ? "Save program" : "Create program";
+  const savingLabel = mode === "edit" ? "Saving..." : "Creating...";
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="modal-card modal-card-wide"
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Program builder</p>
+            <h2>{title}</h2>
+          </div>
+          <button className="ghost-button" type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        <form className="form-grid" onSubmit={onSubmit}>
+          <label className="field">
+            <span>Program name</span>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => onFieldChange("name", e.target.value)}
+              required
+            />
+          </label>
+
+          <div className="inline-fields three-up">
+            <label className="field">
+              <span>Phase</span>
+              <select value={form.phase} onChange={(e) => onPhaseChange(e.target.value)}>
+                {phaseOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+            <label className="field">
+              <span>Program type</span>
+              <select
+                value={form.variant}
+                onChange={(e) => onFieldChange("variant", e.target.value)}
+                disabled={form.phase !== "Eccentrics"}
+              >
+                {getVariantOptions(form.phase).map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+            <label className="field">
+              <span>Frequency</span>
+              <select value={form.frequency} onChange={(e) => onFrequencyChange(e.target.value)}>
+                {allFrequencies.map((f) => <option key={f} value={f}>{f} days</option>)}
+              </select>
+            </label>
+          </div>
+
+          <ProgramBuilderBody
+            form={form}
+            editorView={editorView}
+            setEditorView={setEditorView}
+            activeSegment={activeSegment}
+            setActiveSegment={setActiveSegment}
+            library={library}
+            liftByNormalizedName={liftByNormalizedName}
+            onUpdateDay={onUpdateDay}
+            onUpdateLiftField={onUpdateLiftField}
+            onAddLift={onAddLift}
+            onRemoveLift={onRemoveLift}
+            onMoveLift={onMoveLift}
+            focusNextRowRef={focusNextRowRef}
+          />
+
+          {error ? <p className="form-error">{error}</p> : null}
+
+          <div className="modal-actions program-modal-actions">
+            {onDelete ? (
+              <button className="ghost-button danger" type="button" onClick={onDelete}>
+                Delete program
+              </button>
+            ) : <span />}
+            <div className="modal-actions-right">
+              <button className="ghost-button" type="button" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="primary-button" type="submit" disabled={submitting}>
+                {submitting ? savingLabel : submitLabel}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ProgramBuilderBody({
+  form,
+  editorView,
+  setEditorView,
+  activeSegment,
+  setActiveSegment,
+  library,
+  liftByNormalizedName,
+  onUpdateDay,
+  onUpdateLiftField,
+  onAddLift,
+  onRemoveLift,
+  onMoveLift,
+  focusNextRowRef
+}) {
+  // Compute segments: days[] in "days" view, populated blocks[] in "blocks" view.
+  const daySegments = form.days.map((day, dayIndex) => ({
+    key: `day-${dayIndex}`,
+    label: `Day ${dayIndex + 1}`,
+    entries: day.lifts.map((lift, liftIndex) => ({
+      dayIndex,
+      liftIndex,
+      lift,
+      liftsInDay: day.lifts.length
+    }))
+  }));
+
+  const blockMap = new Map();
+  for (const placement of workoutPlacementOptions) blockMap.set(placement, []);
+  form.days.forEach((day, dayIndex) => {
+    day.lifts.forEach((lift, liftIndex) => {
+      const label = workoutPlacementOptions.includes(lift.blockLabel) ? lift.blockLabel : "Block 1";
+      blockMap.get(label).push({ dayIndex, liftIndex, lift, liftsInDay: day.lifts.length });
+    });
+  });
+  const blockSegments = Array.from(blockMap.entries())
+    .filter(([, entries]) => entries.length > 0)
+    .map(([label, entries]) => ({ key: `block-${label}`, label, entries }));
+
+  const segments = editorView === "days" ? daySegments : blockSegments;
+  const safeActive = Math.min(activeSegment, Math.max(0, segments.length - 1));
+  const active = segments[safeActive] || null;
+
+  return (
+    <div className="builder-body">
+      <div className="builder-toolbar">
+        <div className="builder-view-toggle" role="tablist" aria-label="Editor view">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorView === "days"}
+            className={`tab-toggle ${editorView === "days" ? "is-active" : ""}`}
+            onClick={() => setEditorView("days")}
+          >
+            By day
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorView === "blocks"}
+            className={`tab-toggle ${editorView === "blocks" ? "is-active" : ""}`}
+            onClick={() => setEditorView("blocks")}
+          >
+            By block
+          </button>
+        </div>
+
+        <div className="builder-segment-tabs" role="tablist" aria-label={editorView === "days" ? "Days" : "Blocks"}>
+          {segments.length === 0 ? (
+            <span className="muted-copy compact-copy">No lifts assigned yet — use By day to add.</span>
+          ) : (
+            segments.map((seg, index) => (
+              <button
+                key={seg.key}
+                type="button"
+                role="tab"
+                aria-selected={index === safeActive}
+                className={`builder-segment-tab ${index === safeActive ? "is-active" : ""}`}
+                onClick={() => setActiveSegment(index)}
+              >
+                {seg.label}
+                <span className="builder-segment-tab-count">{seg.entries.length}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {active ? (
+        <>
+          {editorView === "days" ? (
+            <DayHeader
+              day={form.days[safeActive]}
+              dayIndex={safeActive}
+              onUpdateDay={onUpdateDay}
+            />
+          ) : null}
+
+          <LiftTable
+            entries={active.entries}
+            library={library}
+            liftByNormalizedName={liftByNormalizedName}
+            onUpdateLiftField={onUpdateLiftField}
+            onRemoveLift={onRemoveLift}
+            onMoveLift={onMoveLift}
+            showDayColumn={editorView === "blocks"}
+            focusNextRowRef={focusNextRowRef}
+          />
+
+          {editorView === "days" ? (
+            <button
+              type="button"
+              className="ghost-button builder-add-lift"
+              onClick={() => onAddLift(safeActive)}
+            >
+              + Add lift
+            </button>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function DayHeader({ day, dayIndex, onUpdateDay }) {
+  return (
+    <div className="builder-day-header">
+      <label className="field compact-field">
+        <span>Week position</span>
+        <select
+          value={day.dayOffset}
+          onChange={(event) =>
+            onUpdateDay(dayIndex, (current) => ({
+              ...current,
+              dayOffset: Number(event.target.value)
+            }))
+          }
+        >
+          {Array.from({ length: 7 }, (_, i) => (
+            <option key={i} value={i}>Day {i + 1}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function LiftTable({
+  entries,
+  library,
+  liftByNormalizedName,
+  onUpdateLiftField,
+  onRemoveLift,
+  onMoveLift,
+  showDayColumn,
+  focusNextRowRef
+}) {
+  // When a new row was just added, focus its Exercise input on next render.
+  const lastEntryKey = entries.length > 0 ? `${entries[entries.length - 1].dayIndex}-${entries[entries.length - 1].liftIndex}` : "";
+  const exerciseInputsRef = useRef({});
+
+  useEffect(() => {
+    const target = focusNextRowRef.current;
+    if (!target) return;
+    const last = entries[entries.length - 1];
+    if (last && last.dayIndex === target.dayIndex) {
+      const key = `${last.dayIndex}-${last.liftIndex}`;
+      const input = exerciseInputsRef.current[key];
+      if (input) input.focus();
+    }
+    focusNextRowRef.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastEntryKey]);
+
+  if (entries.length === 0) {
+    return <p className="empty-state">No lifts in this view yet.</p>;
+  }
+
+  return (
+    <div className="lift-table-wrapper">
+      <table className="lift-table">
+        <thead>
+          <tr>
+            {showDayColumn ? <th>Day</th> : null}
+            <th>Block</th>
+            <th>Exercise</th>
+            <th>Sets</th>
+            <th>Reps</th>
+            <th>Weight</th>
+            <th>Notes</th>
+            <th aria-label="Actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map(({ dayIndex, liftIndex, lift, liftsInDay }) => {
+            const rowKey = `${dayIndex}-${liftIndex}`;
+            const matched = liftByNormalizedName.get(normalizeText(lift.exerciseName));
+            const willCreate = lift.exerciseName.trim() && !matched;
+            return (
+              <tr key={rowKey} className="lift-table-row">
+                {showDayColumn ? (
+                  <td className="lift-table-day">
+                    <span className="status-badge">Day {dayIndex + 1}</span>
+                  </td>
+                ) : null}
+                <td>
+                  <select
+                    className="lift-table-input"
+                    value={lift.blockLabel}
+                    onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "blockLabel", e.target.value)}
+                  >
+                    {workoutPlacementOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="lift-table-exercise">
+                  <input
+                    ref={(el) => {
+                      if (el) exerciseInputsRef.current[rowKey] = el;
+                    }}
+                    list={`builder-lifts-${rowKey}`}
+                    className="lift-table-input"
+                    value={lift.exerciseName}
+                    onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "exerciseName", e.target.value)}
+                    placeholder="Type or pick"
+                    required
+                  />
+                  <datalist id={`builder-lifts-${rowKey}`}>
+                    {(library?.liftLibrary || []).map((l) => (
+                      <option key={l.id} value={l.name} />
+                    ))}
+                  </datalist>
+                  {willCreate ? (
+                    <span className="muted-copy compact-copy lift-table-newlift-hint">
+                      New library lift on save
+                    </span>
+                  ) : null}
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min="1"
+                    className="lift-table-input lift-table-num"
+                    value={lift.sets}
+                    onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "sets", e.target.value)}
+                    required
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min="1"
+                    className="lift-table-input lift-table-num"
+                    value={lift.reps}
+                    onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "reps", e.target.value)}
+                    required
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    className="lift-table-input"
+                    value={lift.weight}
+                    onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "weight", e.target.value)}
+                    required
+                  />
+                </td>
+                <td className="lift-table-notes">
+                  <input
+                    type="text"
+                    className="lift-table-input"
+                    value={lift.notes}
+                    onChange={(e) => onUpdateLiftField(dayIndex, liftIndex, "notes", e.target.value)}
+                    placeholder="—"
+                  />
+                </td>
+                <td className="lift-table-actions">
+                  <button
+                    type="button"
+                    className="ghost-button icon-button"
+                    onClick={() => onMoveLift(dayIndex, liftIndex, -1)}
+                    disabled={liftIndex === 0}
+                    aria-label="Move up"
+                    title="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button icon-button"
+                    onClick={() => onMoveLift(dayIndex, liftIndex, 1)}
+                    disabled={liftIndex >= liftsInDay - 1}
+                    aria-label="Move down"
+                    title="Move down"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button icon-button"
+                    onClick={() => onRemoveLift(dayIndex, liftIndex)}
+                    disabled={liftsInDay === 1}
+                    aria-label="Remove lift"
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+

@@ -384,6 +384,91 @@ async function saveProgram(req, res, { mode }) {
   });
 }
 
+router.put("/lifts/:id", async (req, res, next) => {
+  try {
+    const library = await readProgramLibrary();
+    const target = library.liftLibrary.find((l) => l.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ error: "Lift not found." });
+    }
+
+    const validated = normalizeExercisePayload(req.body);
+    if (validated.error) {
+      return res.status(400).json({ error: validated.error });
+    }
+
+    const updatedLift = { id: target.id, ...validated.value };
+    const nextLibrary = {
+      ...library,
+      liftLibrary: library.liftLibrary.map((l) => (l.id === target.id ? updatedLift : l))
+    };
+
+    assertValidLibrary(nextLibrary);
+    await writeProgramLibrary(nextLibrary);
+
+    await recordAudit({
+      req,
+      action: "program_library.update",
+      targetType: "lift_library_entry",
+      targetId: updatedLift.id,
+      targetLabel: updatedLift.name,
+      metadata: { category: updatedLift.category }
+    });
+
+    return res.json({ lift: updatedLift, ...libraryResponse(nextLibrary) });
+  } catch (error) {
+    if (error?.status === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    return next(error);
+  }
+});
+
+router.delete("/lifts/:id", async (req, res, next) => {
+  try {
+    const library = await readProgramLibrary();
+    const target = library.liftLibrary.find((l) => l.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ error: "Lift not found." });
+    }
+
+    // Refuse deletion if any program still uses this lift — the
+    // validateProgramLibrary check would catch it after the fact, but
+    // we want a clear error before touching anything.
+    const usedIn = (library.programs || []).filter((p) =>
+      (p.days || []).some((d) => (d.lifts || []).some((l) => l.liftId === target.id))
+    );
+    if (usedIn.length > 0) {
+      return res.status(400).json({
+        error: `In use by ${usedIn.length} program${usedIn.length === 1 ? "" : "s"} (${usedIn
+          .slice(0, 3)
+          .map((p) => p.name)
+          .join(", ")}${usedIn.length > 3 ? "..." : ""}). Remove it from those programs first.`
+      });
+    }
+
+    const nextLibrary = {
+      ...library,
+      liftLibrary: library.liftLibrary.filter((l) => l.id !== target.id)
+    };
+
+    await writeProgramLibrary(nextLibrary);
+
+    await recordAudit({
+      req,
+      action: "program_library.delete",
+      targetType: "lift_library_entry",
+      targetId: target.id,
+      targetLabel: target.name,
+      metadata: { category: target.category }
+    });
+
+    return res.json(libraryResponse(nextLibrary));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post("/programs", async (req, res, next) => {
   try {
     return await saveProgram(req, res, { mode: "create" });

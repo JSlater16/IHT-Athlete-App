@@ -246,7 +246,9 @@
   font-style: italic;
 }
 
-.program-builder-view-toggle {
+/* Pill toggle reused by old + new builder layouts */
+.program-builder-view-toggle,
+.builder-view-toggle {
   display: inline-flex;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -256,7 +258,8 @@
   gap: 0.2rem;
 }
 
-.program-builder-view-toggle .tab-toggle {
+.program-builder-view-toggle .tab-toggle,
+.builder-view-toggle .tab-toggle {
   appearance: none;
   border: none;
   background: transparent;
@@ -270,13 +273,322 @@
   transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
 }
 
-.program-builder-view-toggle .tab-toggle.is-active {
+.program-builder-view-toggle .tab-toggle.is-active,
+.builder-view-toggle .tab-toggle.is-active {
   background: var(--accent);
   color: var(--accent-fg, #fff);
 }
 
-.program-builder-view-toggle .tab-toggle:hover:not(.is-active) {
+.program-builder-view-toggle .tab-toggle:hover:not(.is-active),
+.builder-view-toggle .tab-toggle:hover:not(.is-active) {
   color: var(--text);
+}
+
+/* ===== Program family cards ===== */
+
+.program-family-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.program-family-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong, var(--line));
+  border-radius: 18px;
+  background: var(--surface);
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+
+.program-family-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.program-family-card-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.program-family-name {
+  color: var(--text);
+}
+
+.program-family-frequencies {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.program-family-freq {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+
+.program-family-freq.is-existing {
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  border-color: transparent;
+}
+
+.program-family-freq.is-existing:hover {
+  filter: brightness(1.04);
+}
+
+.program-family-freq.is-empty {
+  color: var(--text-soft);
+  border-style: dashed;
+}
+
+.program-family-freq.is-empty:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Phase accents on the family card left border. Subtle so coaches
+   scan-read but don't get visually shouted at. */
+.program-family-card.phase-rehab    { border-left-color: #8b5cf6; }
+.program-family-card.phase-prep     { border-left-color: #0ea5e9; }
+.program-family-card.phase-eccentrics { border-left-color: #ef4444; }
+.program-family-card.phase-iso      { border-left-color: #f59e0b; }
+.program-family-card.phase-power    { border-left-color: #22c55e; }
+.program-family-card.phase-speed    { border-left-color: #ec4899; }
+
+/* ===== Misc. lift library list ===== */
+
+.misc-lift-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.misc-lift-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.misc-lift-main {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.misc-lift-main strong {
+  font-weight: 600;
+}
+
+.misc-lift-default {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.misc-lift-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* ===== Builder: segment tabs + compact lift table ===== */
+
+.builder-body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.builder-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+  justify-content: space-between;
+}
+
+.builder-segment-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.builder-segment-tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-soft);
+  padding: 0.4rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+
+.builder-segment-tab.is-active {
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  border-color: transparent;
+}
+
+.builder-segment-tab:hover:not(.is-active) {
+  color: var(--text);
+}
+
+.builder-segment-tab-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  min-width: 1.3rem;
+  text-align: center;
+}
+
+.builder-segment-tab.is-active .builder-segment-tab-count {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.builder-day-header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.builder-add-lift {
+  align-self: start;
+}
+
+.lift-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.lift-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.lift-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  padding: 0.55rem 0.65rem;
+  background: var(--surface-translucent);
+  border-bottom: 1px solid var(--line);
+}
+
+.lift-table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.lift-table tr:last-child td {
+  border-bottom: none;
+}
+
+.lift-table-input {
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+}
+
+.lift-table-input:hover,
+.lift-table-input:focus {
+  background: var(--surface);
+  border-color: var(--line);
+  outline: none;
+}
+
+.lift-table-input:focus {
+  border-color: var(--accent);
+}
+
+.lift-table-num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-table-exercise {
+  min-width: 200px;
+}
+
+.lift-table-notes {
+  min-width: 180px;
+}
+
+.lift-table-newlift-hint {
+  display: block;
+  padding-left: 0.55rem;
+  padding-top: 0.15rem;
+  font-style: italic;
+}
+
+.lift-table-actions {
+  display: flex;
+  gap: 0.2rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.lift-table-day {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Modal action row with destructive on left, primary on right */
+.program-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.modal-actions-right {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.ghost-button.danger {
+  color: var(--danger, #ef4444);
+}
+
+.ghost-button.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .program-builder-lift-daytag {
