@@ -24,7 +24,7 @@ const tabs = [
   { id: "rehab", label: "Rehab" }
 ];
 
-const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"];
+const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed", "Developmental"];
 const fallbackModelOptions = ["10-Week", "20-Week"];
 const standardProgramVariant = "Standard";
 const eccentricProgramVariants = ["Alactic Eccentrics", "Lactic Eccentrics"];
@@ -1155,7 +1155,7 @@ export default function CoachAthleteProfilePage() {
                   </>
                 ) : (
                   <p className="muted-copy">
-                    Rehab is handled outside the standard Prep, Eccentrics, Iso, Power, Speed timeline.
+                    {overviewForm.phase} is handled outside the standard {orderedTrainingPhases.join(", ")} timeline.
                   </p>
                 )}
               </div>
