@@ -44,28 +44,6 @@ function phaseClass(phase) {
   return `phase-${phase ? phase.toLowerCase() : "default"}`;
 }
 
-function createLiftForm() {
-  return {
-    name: "",
-    category: "",
-    defaultSets: "3",
-    defaultReps: "5",
-    defaultWeight: "Bodyweight",
-    defaultNotes: ""
-  };
-}
-
-function liftToForm(lift) {
-  return {
-    name: lift.name || "",
-    category: lift.category || "",
-    defaultSets: String(lift.defaultSets ?? "3"),
-    defaultReps: String(lift.defaultReps ?? "5"),
-    defaultWeight: lift.defaultWeight || "",
-    defaultNotes: lift.defaultNotes || ""
-  };
-}
-
 function createProgramLiftRow() {
   return {
     liftId: "",
@@ -121,8 +99,39 @@ function getVariantOptions(phase) {
   return phase === "Eccentrics" ? eccentricProgramVariants : [standardProgramVariant];
 }
 
-function summarizeLiftDefault(lift) {
-  return `${lift.defaultSets}×${lift.defaultReps} • ${lift.defaultWeight}`;
+function createMiscLiftRow() {
+  return createProgramLiftRow();
+}
+
+function createMiscForm() {
+  return { name: "", lifts: [createMiscLiftRow()] };
+}
+
+function miscToForm(workout) {
+  return {
+    name: workout.name || "",
+    lifts: (workout.lifts || []).map((lift) => ({
+      liftId: lift.liftId || "",
+      blockLabel: lift.blockLabel || "Block 1",
+      exerciseName: lift.exerciseName || "",
+      sets: String(lift.sets ?? "3"),
+      reps: String(lift.reps ?? "5"),
+      weight: lift.weight || "Bodyweight",
+      notes: lift.notes || ""
+    }))
+  };
+}
+
+function summarizeMiscBlocks(workout) {
+  const counts = new Map();
+  for (const lift of workout.lifts || []) {
+    const label = lift.blockLabel || "Block 1";
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => workoutPlacementOptions.indexOf(a[0]) - workoutPlacementOptions.indexOf(b[0]))
+    .map(([label, count]) => `${label} (${count})`)
+    .join(" · ");
 }
 
 export default function CoachWorkoutsPage() {
@@ -133,15 +142,16 @@ export default function CoachWorkoutsPage() {
   const [toast, setToast] = useState("");
 
   const [programSearch, setProgramSearch] = useState("");
-  const [liftSearch, setLiftSearch] = useState("");
+  const [miscSearch, setMiscSearch] = useState("");
 
-  // Lift modal (create or edit a single library lift)
-  const [liftModal, setLiftModal] = useState({ open: false, mode: "create", liftId: null });
-  const [liftForm, setLiftForm] = useState(createLiftForm());
-  const [liftFormError, setLiftFormError] = useState("");
-  const [liftSubmitting, setLiftSubmitting] = useState(false);
-  const [pendingLiftDelete, setPendingLiftDelete] = useState(null);
-  const [liftDeleting, setLiftDeleting] = useState(false);
+  // Misc workout modal (single-day standalone workouts)
+  const [miscModal, setMiscModal] = useState({ open: false, mode: "create", miscId: null });
+  const [miscForm, setMiscForm] = useState(createMiscForm());
+  const [miscError, setMiscError] = useState("");
+  const [miscSubmitting, setMiscSubmitting] = useState(false);
+  const [pendingMiscDelete, setPendingMiscDelete] = useState(null);
+  const [miscDeleting, setMiscDeleting] = useState(false);
+  const miscFocusRef = useRef(null);
 
   // Program modal
   const [programModal, setProgramModal] = useState({ open: false, mode: "create", programId: null });
@@ -212,99 +222,169 @@ export default function CoachWorkoutsPage() {
 
   const families = useMemo(() => groupProgramFamilies(filteredPrograms), [filteredPrograms]);
 
-  const filteredLifts = useMemo(() => {
-    const lifts = library?.liftLibrary || [];
-    const q = liftSearch.trim().toLowerCase();
+  const filteredMisc = useMemo(() => {
+    const workouts = library?.miscWorkouts || [];
+    const q = miscSearch.trim().toLowerCase();
     const list = q
-      ? lifts.filter((l) =>
-          [l.name, l.category, l.defaultWeight, l.defaultNotes]
-            .filter(Boolean)
+      ? workouts.filter((w) => {
+          const liftText = (w.lifts || [])
+            .map((l) => l.exerciseName || liftNameById.get(l.liftId) || l.liftId)
             .join(" ")
-            .toLowerCase()
-            .includes(q)
-        )
-      : lifts;
+            .toLowerCase();
+          return [w.name, liftText].filter(Boolean).join(" ").toLowerCase().includes(q);
+        })
+      : workouts;
     return list.slice().sort((a, b) => a.name.localeCompare(b.name));
-  }, [library, liftSearch]);
+  }, [library, liftNameById, miscSearch]);
 
-  // ------- Lift modal handlers -------
+  // ------- Misc workout handlers -------
 
-  function openLiftCreate() {
-    setLiftForm(createLiftForm());
-    setLiftFormError("");
-    setLiftModal({ open: true, mode: "create", liftId: null });
+  function openMiscCreate() {
+    setMiscForm(createMiscForm());
+    setMiscError("");
+    setMiscModal({ open: true, mode: "create", miscId: null });
   }
 
-  function openLiftEdit(lift) {
-    setLiftForm(liftToForm(lift));
-    setLiftFormError("");
-    setLiftModal({ open: true, mode: "edit", liftId: lift.id });
+  function openMiscEdit(workout) {
+    setMiscForm(miscToForm(workout));
+    setMiscError("");
+    setMiscModal({ open: true, mode: "edit", miscId: workout.id });
   }
 
-  function closeLiftModal() {
-    setLiftModal({ open: false, mode: "create", liftId: null });
-    setLiftForm(createLiftForm());
-    setLiftFormError("");
+  function closeMiscModal() {
+    setMiscModal({ open: false, mode: "create", miscId: null });
+    setMiscForm(createMiscForm());
+    setMiscError("");
   }
 
-  async function handleSaveLift(event) {
-    event.preventDefault();
-    setLiftFormError("");
+  function updateMiscLiftField(_dayIndex, liftIndex, field, value) {
+    setMiscForm((cur) => ({
+      ...cur,
+      lifts: cur.lifts.map((l, i) => {
+        if (i !== liftIndex) return l;
+        if (field === "exerciseName") {
+          const matched = liftByNormalizedName.get(normalizeText(value));
+          return { ...l, exerciseName: value, liftId: matched?.id || "" };
+        }
+        return { ...l, [field]: value };
+      })
+    }));
+  }
 
-    if (!liftForm.name.trim()) return setLiftFormError("Lift name is required.");
-    if (!liftForm.category.trim()) return setLiftFormError("Category is required.");
-    if (Number(liftForm.defaultSets) < 1 || Number(liftForm.defaultReps) < 1) {
-      return setLiftFormError("Sets and reps must be at least 1.");
+  function addMiscLift() {
+    miscFocusRef.current = { dayIndex: 0 };
+    setMiscForm((cur) => ({ ...cur, lifts: [...cur.lifts, createMiscLiftRow()] }));
+  }
+
+  function removeMiscLift(_dayIndex, liftIndex) {
+    setMiscForm((cur) => ({ ...cur, lifts: cur.lifts.filter((_, i) => i !== liftIndex) }));
+  }
+
+  function moveMiscLift(_dayIndex, liftIndex, direction) {
+    setMiscForm((cur) => {
+      const target = liftIndex + direction;
+      if (target < 0 || target >= cur.lifts.length) return cur;
+      const nextLifts = cur.lifts.slice();
+      [nextLifts[liftIndex], nextLifts[target]] = [nextLifts[target], nextLifts[liftIndex]];
+      return { ...cur, lifts: nextLifts };
+    });
+  }
+
+  function buildMiscBody() {
+    return {
+      name: miscForm.name.trim(),
+      lifts: miscForm.lifts.map((lift) => {
+        const trimmedName = lift.exerciseName.trim();
+        const matched = liftByNormalizedName.get(normalizeText(trimmedName));
+        const liftId = matched?.id || lift.liftId || "";
+        const entry = {
+          liftId,
+          blockLabel: lift.blockLabel,
+          exerciseName: trimmedName,
+          sets: Number(lift.sets),
+          reps: Number(lift.reps),
+          weight: lift.weight.trim(),
+          notes: lift.notes.trim()
+        };
+        if (!liftId) {
+          entry.newLift = {
+            name: trimmedName,
+            category: customExerciseCategory,
+            defaultSets: Number(lift.sets),
+            defaultReps: Number(lift.reps),
+            defaultWeight: lift.weight.trim(),
+            defaultNotes: lift.notes.trim()
+          };
+        }
+        return entry;
+      })
+    };
+  }
+
+  function validateMiscForm() {
+    if (!miscForm.name.trim()) return "Workout name is required.";
+    if (miscForm.lifts.length === 0) return "Add at least one lift.";
+    for (let liftIndex = 0; liftIndex < miscForm.lifts.length; liftIndex += 1) {
+      const lift = miscForm.lifts[liftIndex];
+      if (!lift.exerciseName.trim()) return `Lift ${liftIndex + 1}: exercise is required.`;
+      if (Number(lift.sets) < 1 || Number(lift.reps) < 1) {
+        return `Lift ${liftIndex + 1}: sets and reps must be at least 1.`;
+      }
+      if (!lift.weight.trim()) return `Lift ${liftIndex + 1}: weight is required.`;
     }
-    if (!liftForm.defaultWeight.trim()) return setLiftFormError("Default weight is required.");
+    return null;
+  }
 
-    setLiftSubmitting(true);
+  async function handleSaveMisc(event) {
+    event.preventDefault();
+    setMiscError("");
+    const validationError = validateMiscForm();
+    if (validationError) {
+      setMiscError(validationError);
+      return;
+    }
+    setMiscSubmitting(true);
     try {
-      const body = {
-        name: liftForm.name.trim(),
-        category: liftForm.category.trim(),
-        defaultSets: Number(liftForm.defaultSets),
-        defaultReps: Number(liftForm.defaultReps),
-        defaultWeight: liftForm.defaultWeight.trim(),
-        defaultNotes: liftForm.defaultNotes.trim()
-      };
-      const isEdit = liftModal.mode === "edit";
+      const body = buildMiscBody();
+      const isEdit = miscModal.mode === "edit";
       const data = await apiRequest(
-        isEdit ? `/api/program-library/lifts/${liftModal.liftId}` : "/api/program-library/lifts",
+        isEdit ? `/api/program-library/misc/${miscModal.miscId}` : "/api/program-library/misc",
         { method: isEdit ? "PUT" : "POST", token, body }
       );
       if (!data?.library) throw new Error("Unexpected response from server.");
       setLibrary(data.library);
-      closeLiftModal();
-      setToast(isEdit ? "Lift updated." : "Lift added.");
+      closeMiscModal();
+      setToast(isEdit ? "Workout saved." : "Workout created.");
     } catch (e) {
-      setLiftFormError(e.message);
+      setMiscError(e.message);
     } finally {
-      setLiftSubmitting(false);
+      setMiscSubmitting(false);
     }
   }
 
-  function requestLiftDelete(lift) {
-    setPendingLiftDelete({ id: lift.id, name: lift.name });
+  function requestMiscDelete() {
+    if (miscModal.mode !== "edit") return;
+    setPendingMiscDelete({ id: miscModal.miscId, name: miscForm.name });
   }
 
-  async function confirmLiftDelete() {
-    if (!pendingLiftDelete) return;
-    setLiftDeleting(true);
+  async function confirmMiscDelete() {
+    if (!pendingMiscDelete) return;
+    setMiscDeleting(true);
     try {
-      const data = await apiRequest(`/api/program-library/lifts/${pendingLiftDelete.id}`, {
+      const data = await apiRequest(`/api/program-library/misc/${pendingMiscDelete.id}`, {
         method: "DELETE",
         token
       });
       if (data?.library) setLibrary(data.library);
       else await loadLibrary();
-      setPendingLiftDelete(null);
-      setToast("Lift removed.");
+      setPendingMiscDelete(null);
+      closeMiscModal();
+      setToast("Workout deleted.");
     } catch (e) {
-      setLiftFormError(e.message);
-      setPendingLiftDelete(null);
+      setMiscError(e.message);
+      setPendingMiscDelete(null);
     } finally {
-      setLiftDeleting(false);
+      setMiscDeleting(false);
     }
   }
 
@@ -577,13 +657,13 @@ export default function CoachWorkoutsPage() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Misc.</p>
-            <h2>Lift library</h2>
+            <h2>One-off workouts</h2>
             <p className="muted-copy compact-copy">
-              Individual lifts you can drop into any program — one-offs, accessories, custom variations.
+              Single-day sessions you can use on their own — testing days, fillers, anything that isn't part of a multi-week program.
             </p>
           </div>
-          <button className="primary-button" type="button" onClick={openLiftCreate}>
-            New lift
+          <button className="primary-button" type="button" onClick={openMiscCreate}>
+            New misc workout
           </button>
         </div>
 
@@ -591,54 +671,62 @@ export default function CoachWorkoutsPage() {
           <input
             className="search-input"
             type="search"
-            placeholder="Search lifts"
-            value={liftSearch}
-            onChange={(event) => setLiftSearch(event.target.value)}
+            placeholder="Search misc workouts"
+            value={miscSearch}
+            onChange={(event) => setMiscSearch(event.target.value)}
           />
         </div>
 
-        {filteredLifts.length === 0 ? (
+        {filteredMisc.length === 0 ? (
           <p className="empty-state">
-            {liftSearch ? "No lifts match that search." : "No lifts in the library yet."}
+            {miscSearch
+              ? "No misc workouts match that search."
+              : "No misc workouts yet. Click New misc workout to build one."}
           </p>
         ) : (
-          <ul className="misc-lift-list">
-            {filteredLifts.map((lift) => (
-              <li key={lift.id} className="misc-lift-row">
-                <div className="misc-lift-main">
-                  <strong>{lift.name}</strong>
-                  <span className="muted-copy compact-copy">{lift.category}</span>
-                </div>
-                <span className="muted-copy compact-copy misc-lift-default">
-                  {summarizeLiftDefault(lift)}
-                </span>
-                <div className="misc-lift-actions">
-                  <button className="ghost-button" type="button" onClick={() => openLiftEdit(lift)}>
-                    Edit
-                  </button>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => requestLiftDelete(lift)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
+          <div className="misc-workout-grid">
+            {filteredMisc.map((workout) => (
+              <article
+                key={workout.id}
+                className="misc-workout-card"
+                onClick={() => openMiscEdit(workout)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openMiscEdit(workout);
+                  }
+                }}
+              >
+                <header className="misc-workout-card-header">
+                  <h3>{workout.name}</h3>
+                  <span className="status-badge">{(workout.lifts || []).length} lifts</span>
+                </header>
+                <p className="muted-copy compact-copy">{summarizeMiscBlocks(workout) || "—"}</p>
+              </article>
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
-      {liftModal.open ? (
-        <LiftFormModal
-          mode={liftModal.mode}
-          form={liftForm}
-          onChange={setLiftForm}
-          onSubmit={handleSaveLift}
-          onClose={closeLiftModal}
-          error={liftFormError}
-          submitting={liftSubmitting}
+      {miscModal.open ? (
+        <MiscWorkoutModal
+          mode={miscModal.mode}
+          form={miscForm}
+          library={library}
+          liftByNormalizedName={liftByNormalizedName}
+          focusNextRowRef={miscFocusRef}
+          onFieldChange={(field, value) => setMiscForm((cur) => ({ ...cur, [field]: value }))}
+          onUpdateLiftField={updateMiscLiftField}
+          onAddLift={addMiscLift}
+          onRemoveLift={removeMiscLift}
+          onMoveLift={moveMiscLift}
+          onSubmit={handleSaveMisc}
+          onClose={closeMiscModal}
+          onDelete={miscModal.mode === "edit" ? requestMiscDelete : null}
+          error={miscError}
+          submitting={miscSubmitting}
         />
       ) : null}
 
@@ -698,18 +786,18 @@ export default function CoachWorkoutsPage() {
       />
 
       <ConfirmModal
-        open={Boolean(pendingLiftDelete)}
-        title="Delete lift"
+        open={Boolean(pendingMiscDelete)}
+        title="Delete misc workout"
         message={
-          pendingLiftDelete
-            ? `Remove "${pendingLiftDelete.name}" from the library? If any program still uses it the delete will be blocked.`
+          pendingMiscDelete
+            ? `Delete "${pendingMiscDelete.name}"? This removes it from the library — anything already assigned to an athlete is unaffected.`
             : ""
         }
-        confirmLabel={liftDeleting ? "Removing..." : "Delete"}
+        confirmLabel={miscDeleting ? "Deleting..." : "Delete"}
         cancelLabel="Cancel"
         danger
-        onConfirm={confirmLiftDelete}
-        onCancel={() => setPendingLiftDelete(null)}
+        onConfirm={confirmMiscDelete}
+        onCancel={() => setPendingMiscDelete(null)}
       />
     </div>
   );
@@ -749,20 +837,43 @@ function ProgramFamilyCard({ family, onOpenFrequency }) {
   );
 }
 
-function LiftFormModal({ mode, form, onChange, onSubmit, onClose, error, submitting }) {
+function MiscWorkoutModal({
+  mode,
+  form,
+  library,
+  liftByNormalizedName,
+  focusNextRowRef,
+  onFieldChange,
+  onUpdateLiftField,
+  onAddLift,
+  onRemoveLift,
+  onMoveLift,
+  onSubmit,
+  onClose,
+  onDelete,
+  error,
+  submitting
+}) {
   const isEdit = mode === "edit";
+  const entries = form.lifts.map((lift, liftIndex) => ({
+    dayIndex: 0,
+    liftIndex,
+    lift,
+    liftsInDay: form.lifts.length
+  }));
+
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <div
-        className="modal-card"
+        className="modal-card modal-card-wide"
         role="dialog"
         aria-modal="true"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Lift library</p>
-            <h2>{isEdit ? "Edit lift" : "New lift"}</h2>
+            <p className="eyebrow">Misc. workout</p>
+            <h2>{isEdit ? "Edit workout" : "New misc workout"}</h2>
           </div>
           <button className="ghost-button" type="button" onClick={onClose}>
             Close
@@ -771,76 +882,48 @@ function LiftFormModal({ mode, form, onChange, onSubmit, onClose, error, submitt
 
         <form className="form-grid" onSubmit={onSubmit}>
           <label className="field">
-            <span>Lift name</span>
+            <span>Workout name</span>
             <input
               type="text"
               value={form.name}
-              onChange={(e) => onChange((cur) => ({ ...cur, name: e.target.value }))}
+              onChange={(event) => onFieldChange("name", event.target.value)}
+              placeholder="e.g. Power testing day"
               required
               autoFocus
             />
           </label>
 
-          <label className="field">
-            <span>Category</span>
-            <input
-              type="text"
-              value={form.category}
-              onChange={(e) => onChange((cur) => ({ ...cur, category: e.target.value }))}
-              required
-            />
-          </label>
+          <LiftTable
+            entries={entries}
+            library={library}
+            liftByNormalizedName={liftByNormalizedName}
+            onUpdateLiftField={onUpdateLiftField}
+            onRemoveLift={onRemoveLift}
+            onMoveLift={onMoveLift}
+            showDayColumn={false}
+            focusNextRowRef={focusNextRowRef}
+          />
 
-          <div className="inline-fields three-up">
-            <label className="field">
-              <span>Default sets</span>
-              <input
-                type="number"
-                min="1"
-                value={form.defaultSets}
-                onChange={(e) => onChange((cur) => ({ ...cur, defaultSets: e.target.value }))}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Default reps</span>
-              <input
-                type="number"
-                min="1"
-                value={form.defaultReps}
-                onChange={(e) => onChange((cur) => ({ ...cur, defaultReps: e.target.value }))}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Default weight</span>
-              <input
-                type="text"
-                value={form.defaultWeight}
-                onChange={(e) => onChange((cur) => ({ ...cur, defaultWeight: e.target.value }))}
-                required
-              />
-            </label>
-          </div>
-
-          <label className="field">
-            <span>Default notes</span>
-            <textarea
-              rows="3"
-              value={form.defaultNotes}
-              onChange={(e) => onChange((cur) => ({ ...cur, defaultNotes: e.target.value }))}
-            />
-          </label>
+          <button type="button" className="ghost-button builder-add-lift" onClick={onAddLift}>
+            + Add lift
+          </button>
 
           {error ? <p className="form-error">{error}</p> : null}
 
-          <div className="modal-actions">
-            <button className="ghost-button" type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <button className="primary-button" type="submit" disabled={submitting}>
-              {submitting ? (isEdit ? "Saving..." : "Adding...") : isEdit ? "Save lift" : "Add lift"}
-            </button>
+          <div className="modal-actions program-modal-actions">
+            {onDelete ? (
+              <button className="ghost-button danger" type="button" onClick={onDelete}>
+                Delete workout
+              </button>
+            ) : <span />}
+            <div className="modal-actions-right">
+              <button className="ghost-button" type="button" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="primary-button" type="submit" disabled={submitting}>
+                {submitting ? (isEdit ? "Saving..." : "Creating...") : isEdit ? "Save workout" : "Create workout"}
+              </button>
+            </div>
           </div>
         </form>
       </div>

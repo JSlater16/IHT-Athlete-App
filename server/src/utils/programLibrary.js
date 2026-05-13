@@ -11,7 +11,13 @@ const allowedFrequencies = new Set([3, 4, 5]);
 
 async function readProgramLibrary() {
   const file = await fs.readFile(LIBRARY_FILE, "utf8");
-  return JSON.parse(file);
+  const parsed = JSON.parse(file);
+  // Older library files only had liftLibrary + programs. Default the
+  // new miscWorkouts slot so callers don't have to null-check.
+  if (!Array.isArray(parsed.miscWorkouts)) {
+    parsed.miscWorkouts = [];
+  }
+  return parsed;
 }
 
 async function writeProgramLibrary(library) {
@@ -48,7 +54,8 @@ function summarizeProgramLibrary(library) {
     variants,
     frequencies,
     liftCount: library.liftLibrary.length,
-    programCount: library.programs.length
+    programCount: library.programs.length,
+    miscCount: Array.isArray(library.miscWorkouts) ? library.miscWorkouts.length : 0
   };
 }
 
@@ -108,6 +115,27 @@ function validateProgramLibrary(library) {
       for (const configuredLift of day.lifts) {
         if (!configuredLift?.liftId || !liftIds.has(configuredLift.liftId)) {
           return "Every programmed lift must reference a valid liftId from the lift library.";
+        }
+      }
+    }
+  }
+
+  // miscWorkouts is optional. When present, validate each entry has
+  // id/name and references valid liftIds.
+  if (library.miscWorkouts !== undefined) {
+    if (!Array.isArray(library.miscWorkouts)) {
+      return "miscWorkouts must be an array.";
+    }
+    for (const workout of library.miscWorkouts) {
+      if (!workout?.id || !workout?.name) {
+        return "Every misc workout must include id and name.";
+      }
+      if (!Array.isArray(workout.lifts) || workout.lifts.length === 0) {
+        return `Misc workout "${workout.name}" must include at least one lift.`;
+      }
+      for (const lift of workout.lifts) {
+        if (!lift?.liftId || !liftIds.has(lift.liftId)) {
+          return `Misc workout "${workout.name}" must reference valid library lifts.`;
         }
       }
     }

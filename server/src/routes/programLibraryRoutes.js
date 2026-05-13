@@ -485,6 +485,158 @@ router.put("/programs/:id", async (req, res, next) => {
   }
 });
 
+// ============== Misc workouts (one-off single-day templates) ==============
+
+function normalizeMiscPayload(body, liftLibrary) {
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const lifts = Array.isArray(body?.lifts) ? body.lifts : [];
+
+  if (!name) {
+    return { error: "Misc workout name is required." };
+  }
+  if (lifts.length === 0) {
+    return { error: "Misc workout must include at least one lift." };
+  }
+
+  let resolution;
+  try {
+    resolution = resolveProgramLifts({ days: [{ dayOffset: 0, lifts }], liftLibrary });
+  } catch (error) {
+    return { error: error.message };
+  }
+
+  const normalizedLifts = resolution.resolvedDays[0].lifts.map((lift, liftIndex) => {
+    const liftId = lift.liftId;
+    const blockLabel = typeof lift?.blockLabel === "string" ? lift.blockLabel.trim() : "";
+    const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
+    const weight = typeof lift?.weight === "string" ? lift.weight.trim() : "";
+    const notes = typeof lift?.notes === "string" ? lift.notes.trim() : "";
+    const sets = Number(lift?.sets);
+    const reps = Number(lift?.reps);
+
+    if (!Number.isFinite(sets) || sets < 1) {
+      throw new Error(`Lift ${liftIndex + 1} needs valid sets.`);
+    }
+    if (!Number.isFinite(reps) || reps < 1) {
+      throw new Error(`Lift ${liftIndex + 1} needs valid reps.`);
+    }
+    if (!weight) {
+      throw new Error(`Lift ${liftIndex + 1} needs a weight value.`);
+    }
+    return { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
+  });
+
+  return { value: { name, lifts: normalizedLifts }, nextLifts: resolution.nextLifts };
+}
+
+async function saveMiscWorkout(req, res, { mode }) {
+  const library = await readProgramLibrary();
+  const existing = Array.isArray(library.miscWorkouts) ? library.miscWorkouts : [];
+
+  let validated;
+  try {
+    validated = normalizeMiscPayload(req.body, library.liftLibrary);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (validated.error) {
+    return res.status(400).json({ error: validated.error });
+  }
+
+  const workoutId = mode === "update" ? req.params.id : null;
+  if (mode === "update" && !existing.some((w) => w.id === workoutId)) {
+    return res.status(404).json({ error: "Misc workout not found." });
+  }
+
+  const existingIds = new Set(existing.map((w) => w.id));
+  const id =
+    mode === "update"
+      ? workoutId
+      : createUniqueId(slugify(validated.value.name) || "misc-workout", existingIds);
+  const savedWorkout = { id, ...validated.value };
+
+  const nextMisc =
+    mode === "update"
+      ? existing.map((w) => (w.id === id ? savedWorkout : w))
+      : [...existing, savedWorkout];
+
+  const nextLibrary = {
+    ...library,
+    liftLibrary: validated.nextLifts,
+    miscWorkouts: nextMisc
+  };
+
+  try {
+    assertValidLibrary(nextLibrary);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  await writeProgramLibrary(nextLibrary);
+
+  await recordAudit({
+    req,
+    action: mode === "update" ? "program_library.update" : "program_library.create",
+    targetType: "misc_workout",
+    targetId: savedWorkout.id,
+    targetLabel: savedWorkout.name,
+    metadata: { liftCount: savedWorkout.lifts.length }
+  });
+
+  return res.status(mode === "update" ? 200 : 201).json({
+    miscWorkout: savedWorkout,
+    ...libraryResponse(nextLibrary)
+  });
+}
+
+router.post("/misc", async (req, res, next) => {
+  try {
+    return await saveMiscWorkout(req, res, { mode: "create" });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/misc/:id", async (req, res, next) => {
+  try {
+    return await saveMiscWorkout(req, res, { mode: "update" });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/misc/:id", async (req, res, next) => {
+  try {
+    const library = await readProgramLibrary();
+    const existing = Array.isArray(library.miscWorkouts) ? library.miscWorkouts : [];
+    const target = existing.find((w) => w.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ error: "Misc workout not found." });
+    }
+
+    const nextLibrary = {
+      ...library,
+      miscWorkouts: existing.filter((w) => w.id !== target.id)
+    };
+
+    await writeProgramLibrary(nextLibrary);
+
+    await recordAudit({
+      req,
+      action: "program_library.delete",
+      targetType: "misc_workout",
+      targetId: target.id,
+      targetLabel: target.name
+    });
+
+    return res.json(libraryResponse(nextLibrary));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ============== Programs ==============
+
 router.delete("/programs/:id", async (req, res, next) => {
   try {
     const library = await readProgramLibrary();
