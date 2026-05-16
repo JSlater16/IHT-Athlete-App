@@ -16,10 +16,7 @@ const WEIGHTS = Object.freeze({
 
 const METRIC_KEYS = Object.freeze(Object.keys(WEIGHTS));
 
-// Production target is 14 days, temporarily relaxed to 365 so scores
-// surface in the UI before athletes accumulate enough recent test
-// density. Flip back to 14 once cadence catches up.
-const BASELINE_WINDOW_DAYS = 365;
+const BASELINE_WINDOW_DAYS = 14;
 const MIN_BASELINE_TESTS = 2;
 const CONFIDENCE_K = 4;
 
