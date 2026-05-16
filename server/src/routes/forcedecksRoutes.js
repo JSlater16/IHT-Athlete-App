@@ -3,7 +3,12 @@ const { prisma } = require("../utils/prisma");
 const { requireAthlete, requireCoach } = require("../middleware/auth");
 const { recordAudit } = require("../utils/audit");
 const { METRICS, isValidMetricKey } = require("../utils/forcedecks");
-const { computeAndApplyReadiness } = require("../utils/readinessApply");
+const { computeAndApplyReadiness, shapeTest } = require("../utils/readinessApply");
+const {
+  calculateReadiness,
+  METRIC_KEYS: READINESS_METRIC_KEYS,
+  BASELINE_WINDOW_DAYS
+} = require("../utils/readiness");
 
 const router = express.Router();
 
@@ -222,6 +227,75 @@ router.get("/roster", requireCoach, async (req, res, next) => {
       });
 
     return res.json({ athletes: rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// GET /api/forcedecks/diagnose/:athleteId — coach-only readiness
+// diagnostic. Returns enough to see exactly why a score is null:
+// today's metrics, prior count in 14d window, and the calculator's
+// raw output (which carries the error/status string).
+router.get("/diagnose/:athleteId", requireCoach, async (req, res, next) => {
+  try {
+    const profile = await prisma.athleteProfile.findUnique({
+      where: { id: req.params.athleteId },
+      select: { id: true, user: { select: { name: true } } }
+    });
+    if (!profile) return res.status(404).json({ error: "Athlete not found" });
+
+    const latest = await prisma.forceDecksTest.findFirst({
+      where: { athleteId: profile.id },
+      orderBy: { testDate: "desc" },
+      include: { metrics: true }
+    });
+    if (!latest) {
+      return res.json({
+        athleteId: profile.id,
+        name: profile.user.name,
+        message: "No ForceDecks tests on file for this athlete."
+      });
+    }
+
+    const cutoff = new Date(
+      latest.testDate.getTime() - BASELINE_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    );
+    const priors = await prisma.forceDecksTest.findMany({
+      where: {
+        athleteId: profile.id,
+        id: { not: latest.id },
+        testDate: { gte: cutoff, lt: latest.testDate }
+      },
+      include: { metrics: true },
+      orderBy: { testDate: "asc" }
+    });
+
+    const todayMetricsPresent = Object.keys(shapeTest(latest).metrics).sort();
+    const missingReadinessMetrics = READINESS_METRIC_KEYS.filter(
+      (k) => !todayMetricsPresent.includes(k)
+    );
+
+    const liveResult = calculateReadiness(
+      shapeTest(latest),
+      priors.map(shapeTest)
+    );
+
+    return res.json({
+      athleteId: profile.id,
+      name: profile.user.name,
+      latestTest: {
+        id: latest.id,
+        testDate: latest.testDate,
+        readinessScore: latest.readinessScore,
+        storedReadinessDetails: latest.readinessDetails,
+        metricsPresent: todayMetricsPresent,
+        missingReadinessMetrics
+      },
+      priorTestsInWindow: priors.length,
+      priorTestDates: priors.map((p) => p.testDate),
+      readinessRequiredMetrics: READINESS_METRIC_KEYS,
+      liveRecompute: liveResult
+    });
   } catch (error) {
     return next(error);
   }
