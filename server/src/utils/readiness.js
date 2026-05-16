@@ -151,7 +151,10 @@ function calculateReadiness(todayTest, priorTests, options = {}) {
 
   const rRaw = 100 * weightedRatioSum;
   const c = nBaselineTests / (nBaselineTests + CONFIDENCE_K);
-  const rDisplayed = 100 + c * (rRaw - 100);
+  // Displayed score caps at 100. Above-baseline performance still
+  // surfaces in raw_score and the green_peaked status; the UI just
+  // never shows >100, which would imply "more than fully recovered."
+  const rDisplayed = Math.min(100 + c * (rRaw - 100), 100);
   const status = bucketize(rDisplayed);
 
   return {
