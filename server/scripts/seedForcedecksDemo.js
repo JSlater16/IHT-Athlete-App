@@ -27,14 +27,16 @@ const BASELINES = {
   jump_height: [12, 22, "in"],
   watts_per_kg: [35, 65, "W/kg"],
   concentric_impulse_50ms: [50, 150, "N·s"],
-  concentric_impulse_100ms: [150, 350, "N·s"],
+  concentric_impulse_at_100ms: [150, 350, "N·s"],
   rsi_modified: [0.3, 0.65, ""],
   impulse_momentum: [200, 400, "N·s"],
   concentric_peak_velocity: [2.0, 3.5, "m/s"],
   concentric_mean_power: [1500, 3500, "W"],
+  concentric_rfd: [6000, 12000, "N/s"],
   eccentric_braking_rfd: [4000, 9000, "N/s"],
   eccentric_peak_force: [1500, 3000, "N"],
-  force_at_0_velocity: [1500, 2800, "N"],
+  eccentric_peak_velocity: [0.8, 1.6, "m/s"],
+  force_at_zero_velocity: [1500, 2800, "N"],
   countermovement_depth: [12, 30, "in"]
 };
 

@@ -78,19 +78,22 @@ model RehabNote {
 
 // VALD ForceDecks test results. One row per test session, with N
 // child ForceDecksMetric rows (one per measured metric). Readiness
-// score is computed externally (CV-based formula) and stored here
-// directly — no business logic on this end. externalId is the VALD
-// test id, used for idempotent ingest.
+// score is computed server-side from the 4-metric personal-baseline
+// equation (see server/src/utils/readiness.js). readinessScore is the
+// rounded displayed value used by every UI surface; readinessDetails
+// carries the full breakdown (raw, confidence, status, baselines,
+// deltas) for trend analysis.
 model ForceDecksTest {
-  id             String             @id @default(cuid())
-  athleteId      String
-  testDate       DateTime
-  readinessScore Int?
-  source         String             @default("vald")
-  externalId     String?            @unique
-  createdAt      DateTime           @default(now())
-  athlete        AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  metrics        ForceDecksMetric[]
+  id               String             @id @default(cuid())
+  athleteId        String
+  testDate         DateTime
+  readinessScore   Int?
+  readinessDetails Json?
+  source           String             @default("vald")
+  externalId       String?            @unique
+  createdAt        DateTime           @default(now())
+  athlete          AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  metrics          ForceDecksMetric[]
 
   @@index([athleteId, testDate])
 }

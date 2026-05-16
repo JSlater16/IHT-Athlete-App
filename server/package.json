@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
+    "test": "node --test src/**/__tests__/*.test.js",
     "build": "node -e \"console.log('Server build complete')\"",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma migrate deploy",

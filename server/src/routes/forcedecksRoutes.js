@@ -3,6 +3,7 @@ const { prisma } = require("../utils/prisma");
 const { requireAthlete, requireCoach } = require("../middleware/auth");
 const { recordAudit } = require("../utils/audit");
 const { METRICS, isValidMetricKey } = require("../utils/forcedecks");
+const { computeAndApplyReadiness } = require("../utils/readinessApply");
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ function serializeTest(test) {
     id: test.id,
     testDate: test.testDate,
     readinessScore: test.readinessScore,
+    readinessDetails: test.readinessDetails || null,
     source: test.source,
     externalId: test.externalId,
     metrics
@@ -255,16 +257,13 @@ router.post("/athletes/:athleteId", requireCoach, async (req, res, next) => {
       return res.status(404).json({ error: "Athlete not found" });
     }
 
-    const { testDate, readinessScore, source, externalId, metrics } = req.body || {};
+    // readinessScore is intentionally not accepted from the client —
+    // the server computes it from the metrics + the athlete's prior
+    // 14-day window. Anything in the body for that field is ignored.
+    const { testDate, source, externalId, metrics } = req.body || {};
 
     if (!testDate || Number.isNaN(new Date(testDate).getTime())) {
       return res.status(400).json({ error: "testDate is required and must be a valid date" });
-    }
-    if (readinessScore != null) {
-      const score = Number(readinessScore);
-      if (!Number.isFinite(score) || score < 0 || score > 100) {
-        return res.status(400).json({ error: "readinessScore must be 0-100 or null" });
-      }
     }
     if (!Array.isArray(metrics) || metrics.length === 0) {
       return res.status(400).json({ error: "metrics must be a non-empty array" });
@@ -287,7 +286,7 @@ router.post("/athletes/:athleteId", requireCoach, async (req, res, next) => {
       ? await prisma.forceDecksTest.findUnique({ where: { externalId } })
       : null;
 
-    const test = await prisma.$transaction(async (tx) => {
+    const persisted = await prisma.$transaction(async (tx) => {
       if (existing) {
         await tx.forceDecksMetric.deleteMany({ where: { testId: existing.id } });
         return tx.forceDecksTest.update({
@@ -295,7 +294,6 @@ router.post("/athletes/:athleteId", requireCoach, async (req, res, next) => {
           data: {
             athleteId: profile.id,
             testDate: new Date(testDate),
-            readinessScore: readinessScore != null ? Math.round(Number(readinessScore)) : null,
             source: typeof source === "string" ? source : "vald",
             metrics: {
               create: metrics.map((m) => ({
@@ -312,7 +310,6 @@ router.post("/athletes/:athleteId", requireCoach, async (req, res, next) => {
         data: {
           athleteId: profile.id,
           testDate: new Date(testDate),
-          readinessScore: readinessScore != null ? Math.round(Number(readinessScore)) : null,
           source: typeof source === "string" ? source : "vald",
           externalId: externalId || null,
           metrics: {
@@ -325,6 +322,12 @@ router.post("/athletes/:athleteId", requireCoach, async (req, res, next) => {
         },
         include: { metrics: true }
       });
+    });
+
+    await computeAndApplyReadiness(persisted.id);
+    const test = await prisma.forceDecksTest.findUnique({
+      where: { id: persisted.id },
+      include: { metrics: true }
     });
 
     await recordAudit({

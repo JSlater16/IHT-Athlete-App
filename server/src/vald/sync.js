@@ -5,6 +5,7 @@ const { valdFetch } = require("./client");
 const { getValdConfig, assertValdCredentials, assertValdTenant } = require("./config");
 const { mapValdResult } = require("./metrics");
 const { METRICS } = require("../utils/forcedecks");
+const { computeAndApplyReadiness } = require("../utils/readinessApply");
 
 // We only sync CMJ tests for now. Other test types (IMTP, SJ, balance)
 // produce different metric sets and would need their own handling.
@@ -76,7 +77,7 @@ async function fetchTrials(testId, tenantId) {
 }
 
 async function upsertTest({ athleteId, test, metrics }) {
-  return prisma.$transaction(async (tx) => {
+  const persisted = await prisma.$transaction(async (tx) => {
     const existing = await tx.forceDecksTest.findUnique({
       where: { externalId: test.testId }
     });
@@ -96,6 +97,10 @@ async function upsertTest({ athleteId, test, metrics }) {
       data: { ...baseData, externalId: test.testId, metrics: { create: metrics } }
     });
   });
+  // Readiness lives outside the upsert tx: computing it requires a
+  // separate query for the 14-day prior window and is cheap to retry.
+  await computeAndApplyReadiness(persisted.id);
+  return persisted;
 }
 
 async function syncAthleteForceDecks(athleteId, { fullHistory = false } = {}) {

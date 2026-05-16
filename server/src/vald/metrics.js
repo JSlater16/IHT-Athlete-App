@@ -20,15 +20,20 @@ const VALD_METRIC_MAP = {
   6553613: { appKey: "jump_height", convert: (v) => v, trend: "positive" },
   6553604: { appKey: "watts_per_kg", convert: (v) => v, trend: "positive" },
   6553674: { appKey: "concentric_impulse_50ms", convert: (v) => v, trend: "positive" },
-  6553675: { appKey: "concentric_impulse_100ms", convert: (v) => v, trend: "positive" },
+  6553675: { appKey: "concentric_impulse_at_100ms", convert: (v) => v, trend: "positive" },
   6553698: { appKey: "rsi_modified", convert: (v) => v, trend: "positive" },
   6553712: { appKey: "impulse_momentum", convert: (v) => v, trend: "positive" },
   6553634: { appKey: "concentric_peak_velocity", convert: (v) => v, trend: "positive" },
   6553623: { appKey: "concentric_mean_power", convert: (v) => v, trend: "positive" },
   6553678: { appKey: "eccentric_braking_rfd", convert: (v) => v, trend: "positive" },
   6553687: { appKey: "eccentric_peak_force", convert: (v) => v, trend: "positive" },
-  6553713: { appKey: "force_at_0_velocity", convert: (v) => v, trend: "positive" },
-  6553603: { appKey: "countermovement_depth", convert: (v) => v, trend: "none" }
+  6553713: { appKey: "force_at_zero_velocity", convert: (v) => v, trend: "positive" },
+  6553603: { appKey: "countermovement_depth", convert: (v) => v, trend: "none" },
+  // Readiness inputs. VALD marks ECCENTRIC_PEAK_VELOCITY as trend
+  // "None" but for our purposes higher = better, so we treat it as
+  // positive when picking the session-best across trials.
+  6553701: { appKey: "eccentric_peak_velocity", convert: (v) => v, trend: "positive" },
+  6553637: { appKey: "concentric_rfd", convert: (v) => v, trend: "positive" }
 };
 
 const VALD_RESULT_IDS = Object.keys(VALD_METRIC_MAP).map(Number);
