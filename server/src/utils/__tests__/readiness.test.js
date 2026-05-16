@@ -80,13 +80,13 @@ test("N=8: confidence = 8/(8+4) = 67", () => {
   assert.equal(result.confidence, 67);
 });
 
-test("N=20: only the 14-day window counts; older priors excluded", () => {
+test("windowDays override: only priors inside the window count", () => {
   const today = makeTest(0);
-  // 8 inside the window (days 1-8), 12 outside (days 15-26).
+  // 8 inside a 14-day window (days 1-8), 12 outside (days 15-26).
   const inside = buildPriors(8);
   const outside = [];
   for (let i = 15; i <= 26; i++) outside.push(makeTest(i));
-  const result = calculateReadiness(today, [...inside, ...outside]);
+  const result = calculateReadiness(today, [...inside, ...outside], { windowDays: 14 });
   assert.equal(result.n_baseline_tests, 8);
 });
 

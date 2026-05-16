@@ -232,6 +232,36 @@ router.get("/roster", requireCoach, async (req, res, next) => {
   }
 });
 
+// POST /api/forcedecks/recompute-readiness — coach-only. Recomputes
+// readiness for every existing ForceDecks test in the DB, in
+// chronological order per athlete, so priors are always in place
+// before each test is scored. Use after changing the window
+// constant or after fixing an ingest-time data issue.
+router.post("/recompute-readiness", requireCoach, async (req, res, next) => {
+  try {
+    const tests = await prisma.forceDecksTest.findMany({
+      select: { id: true, athleteId: true, testDate: true },
+      orderBy: [{ athleteId: "asc" }, { testDate: "asc" }]
+    });
+
+    let scored = 0;
+    let nullScore = 0;
+    for (const t of tests) {
+      const result = await computeAndApplyReadiness(t.id);
+      if (result?.score != null) scored += 1;
+      else nullScore += 1;
+    }
+
+    return res.json({
+      total: tests.length,
+      scored,
+      nullScore
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // GET /api/forcedecks/diagnose/:athleteId — coach-only readiness
 // diagnostic. Returns enough to see exactly why a score is null:
 // today's metrics, prior count in 14d window, and the calculator's
