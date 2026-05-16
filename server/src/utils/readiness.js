@@ -59,7 +59,7 @@ function getMetricValue(test, key) {
 
 // Returns { ok: true, todayValues, baselineValues, nBaselineTests } or
 // { ok: false, error } describing the validation failure.
-function gatherInputs(todayTest, priorTests) {
+function gatherInputs(todayTest, priorTests, { windowDays = BASELINE_WINDOW_DAYS } = {}) {
   const todayValues = {};
   for (const key of METRIC_KEYS) {
     const v = getMetricValue(todayTest, key);
@@ -73,7 +73,7 @@ function gatherInputs(todayTest, priorTests) {
   if (!Number.isFinite(todayMs)) {
     return { ok: false, error: "todayTest.testDate is invalid" };
   }
-  const cutoffMs = todayMs - BASELINE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const cutoffMs = todayMs - windowDays * 24 * 60 * 60 * 1000;
 
   // Drop today itself (by id if present, otherwise by exact timestamp
   // match) and restrict to the 14-day window strictly before today.
@@ -100,8 +100,8 @@ function gatherInputs(todayTest, priorTests) {
   return { ok: true, todayValues, baselineValues, nBaselineTests: eligible.length };
 }
 
-function calculateReadiness(todayTest, priorTests) {
-  const inputs = gatherInputs(todayTest, priorTests);
+function calculateReadiness(todayTest, priorTests, options = {}) {
+  const inputs = gatherInputs(todayTest, priorTests, options);
   if (!inputs.ok) {
     return { status: "error", error: inputs.error, score: null };
   }

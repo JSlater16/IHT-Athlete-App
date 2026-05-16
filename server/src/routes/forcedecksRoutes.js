@@ -260,7 +260,7 @@ router.get("/diagnose/:athleteId", requireCoach, async (req, res, next) => {
     const cutoff = new Date(
       latest.testDate.getTime() - BASELINE_WINDOW_DAYS * 24 * 60 * 60 * 1000
     );
-    const priors = await prisma.forceDecksTest.findMany({
+    const priors14d = await prisma.forceDecksTest.findMany({
       where: {
         athleteId: profile.id,
         id: { not: latest.id },
@@ -270,14 +270,34 @@ router.get("/diagnose/:athleteId", requireCoach, async (req, res, next) => {
       orderBy: { testDate: "asc" }
     });
 
-    const todayMetricsPresent = Object.keys(shapeTest(latest).metrics).sort();
+    const priorsAllTime = await prisma.forceDecksTest.findMany({
+      where: {
+        athleteId: profile.id,
+        id: { not: latest.id },
+        testDate: { lt: latest.testDate }
+      },
+      include: { metrics: true },
+      orderBy: { testDate: "asc" }
+    });
+
+    const todayShaped = shapeTest(latest);
+    const todayMetricsPresent = Object.keys(todayShaped.metrics).sort();
     const missingReadinessMetrics = READINESS_METRIC_KEYS.filter(
       (k) => !todayMetricsPresent.includes(k)
     );
 
-    const liveResult = calculateReadiness(
-      shapeTest(latest),
-      priors.map(shapeTest)
+    const liveResult14d = calculateReadiness(
+      todayShaped,
+      priors14d.map(shapeTest)
+    );
+    // Diagnostic-only recompute against the athlete's full history.
+    // Production readiness keeps the 14-day window; this exists so a
+    // coach can see what the score WOULD be once enough recent
+    // priors accumulate.
+    const liveResultAllTime = calculateReadiness(
+      todayShaped,
+      priorsAllTime.map(shapeTest),
+      { windowDays: 365 * 5 }
     );
 
     return res.json({
@@ -291,10 +311,13 @@ router.get("/diagnose/:athleteId", requireCoach, async (req, res, next) => {
         metricsPresent: todayMetricsPresent,
         missingReadinessMetrics
       },
-      priorTestsInWindow: priors.length,
-      priorTestDates: priors.map((p) => p.testDate),
+      priorTestsInWindow: priors14d.length,
+      priorTestDates: priors14d.map((p) => p.testDate),
+      priorTestsAllTime: priorsAllTime.length,
+      priorTestDatesAllTime: priorsAllTime.map((p) => p.testDate),
       readinessRequiredMetrics: READINESS_METRIC_KEYS,
-      liveRecompute: liveResult
+      liveRecompute: liveResult14d,
+      liveRecomputeAllTime: liveResultAllTime
     });
   } catch (error) {
     return next(error);
