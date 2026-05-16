@@ -77,7 +77,7 @@ async function fetchTrials(testId, tenantId) {
 }
 
 async function upsertTest({ athleteId, test, metrics }) {
-  const persisted = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const existing = await tx.forceDecksTest.findUnique({
       where: { externalId: test.testId }
     });
@@ -97,10 +97,23 @@ async function upsertTest({ athleteId, test, metrics }) {
       data: { ...baseData, externalId: test.testId, metrics: { create: metrics } }
     });
   });
-  // Readiness lives outside the upsert tx: computing it requires a
-  // separate query for the 14-day prior window and is cheap to retry.
-  await computeAndApplyReadiness(persisted.id);
-  return persisted;
+}
+
+// Recompute readiness for every test the sync just touched, in
+// chronological order so each test's priors are already in place.
+// VALD doesn't return tests in date order, so computing during the
+// upsert loop would score the newest test against an empty prior
+// window. Doing this as a second pass fixes that.
+async function recomputeReadinessFor(testIds) {
+  if (!testIds.length) return;
+  const rows = await prisma.forceDecksTest.findMany({
+    where: { id: { in: testIds } },
+    orderBy: { testDate: "asc" },
+    select: { id: true }
+  });
+  for (const row of rows) {
+    await computeAndApplyReadiness(row.id);
+  }
 }
 
 async function syncAthleteForceDecks(athleteId, { fullHistory = false } = {}) {
@@ -131,6 +144,7 @@ async function syncAthleteForceDecks(athleteId, { fullHistory = false } = {}) {
   let imported = 0;
   let skipped = 0;
   let latestModifiedMs = cursorMs;
+  const upsertedIds = [];
 
   for (const test of tests) {
     const modifiedMs = test.modifiedDateUtc ? new Date(test.modifiedDateUtc).getTime() : 0;
@@ -153,9 +167,12 @@ async function syncAthleteForceDecks(athleteId, { fullHistory = false } = {}) {
       continue;
     }
 
-    await upsertTest({ athleteId, test, metrics });
+    const persisted = await upsertTest({ athleteId, test, metrics });
+    upsertedIds.push(persisted.id);
     imported += 1;
   }
+
+  await recomputeReadinessFor(upsertedIds);
 
   // Advance cursor to the latest modifiedDateUtc we saw, falling back
   // to "now" so re-runs don't refetch the same window if nothing
