@@ -29,10 +29,12 @@ const VALD_METRIC_MAP = {
   6553687: { appKey: "eccentric_peak_force", convert: (v) => v, trend: "positive" },
   6553713: { appKey: "force_at_zero_velocity", convert: (v) => v, trend: "positive" },
   6553603: { appKey: "countermovement_depth", convert: (v) => v, trend: "none" },
-  // Readiness inputs. VALD marks ECCENTRIC_PEAK_VELOCITY as trend
-  // "None" but for our purposes higher = better, so we treat it as
-  // positive when picking the session-best across trials.
-  6553701: { appKey: "eccentric_peak_velocity", convert: (v) => v, trend: "positive" },
+  // Readiness inputs. VALD reports ECCENTRIC_PEAK_VELOCITY as a
+  // signed value (negative because the eccentric phase moves
+  // downward). The readiness equation expects positive magnitudes —
+  // "higher EPV = harder loading = better readiness" — so we abs() at
+  // ingest. Trend is positive for the same reason.
+  6553701: { appKey: "eccentric_peak_velocity", convert: (v) => Math.abs(v), trend: "positive" },
   6553637: { appKey: "concentric_rfd", convert: (v) => v, trend: "positive" }
 };
 
