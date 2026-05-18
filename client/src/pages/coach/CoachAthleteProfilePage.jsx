@@ -290,22 +290,25 @@ export default function CoachAthleteProfilePage() {
   const selectedDateKey = toDateInputValue(selectedDay);
   const selectedDayLifts = liftsByDate[selectedDateKey] || [];
   const modelOptions = fallbackModelOptions;
-  const prepProgramOptions = useMemo(() => {
-    return [...new Set((library?.programs || []).filter((program) => program.phase === "Prep").map((program) => program.name))]
+  // Program names present in the library for the currently-selected
+  // phase. The picker uses these for every non-Eccentrics phase so
+  // multiple programs at the same (phase, frequency) slot are
+  // distinguishable in the dropdown.
+  const phaseProgramOptions = useMemo(() => {
+    return [
+      ...new Set(
+        (library?.programs || [])
+          .filter((program) => program.phase === overviewForm.phase)
+          .map((program) => program.name)
+      )
+    ]
       .filter(Boolean)
       .sort((left, right) => left.localeCompare(right));
-  }, [library]);
+  }, [library, overviewForm.phase]);
   const variantOptions = useMemo(() => {
-    if (overviewForm.phase === "Prep") {
-      return prepProgramOptions.length > 0 ? prepProgramOptions : [standardProgramVariant];
-    }
-
-    if (overviewForm.phase === "Eccentrics") {
-      return eccentricProgramVariants;
-    }
-
-    return [standardProgramVariant];
-  }, [overviewForm.phase, prepProgramOptions]);
+    if (overviewForm.phase === "Eccentrics") return eccentricProgramVariants;
+    return phaseProgramOptions.length > 0 ? phaseProgramOptions : [standardProgramVariant];
+  }, [overviewForm.phase, phaseProgramOptions]);
   const frequencyOptions = useMemo(() => {
     const options = librarySummary.frequencies.length > 0 ? librarySummary.frequencies : [3, 4, 5];
     return overviewForm.programmingDays && !options.includes(Number(overviewForm.programmingDays))
@@ -329,15 +332,18 @@ export default function CoachAthleteProfilePage() {
 
     return (
       library.programs.find((program) => {
-        const variantMatches =
-          overviewForm.phase === "Prep"
-            ? program.name === overviewForm.programVariant
-            : (program.variant || standardProgramVariant) === overviewForm.programVariant;
-
+        if (program.phase !== overviewForm.phase) return false;
+        if (Number(program.frequency) !== Number(overviewForm.programmingDays)) return false;
+        if (overviewForm.phase === "Eccentrics") {
+          return (program.variant || standardProgramVariant) === overviewForm.programVariant;
+        }
+        if (program.name === overviewForm.programVariant) return true;
+        // Legacy data fallback: stored "Standard" still resolves to
+        // the single legacy program in phases that historically only
+        // had one Standard template.
         return (
-          program.phase === overviewForm.phase &&
-          variantMatches &&
-          Number(program.frequency) === Number(overviewForm.programmingDays)
+          overviewForm.programVariant === standardProgramVariant &&
+          (program.variant || standardProgramVariant) === standardProgramVariant
         );
       }) || null
     );
@@ -964,20 +970,30 @@ export default function CoachAthleteProfilePage() {
                     <span>Training phase</span>
                     <select
                       value={overviewForm.phase}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const nextPhase = event.target.value;
+                        const namesForPhase = [
+                          ...new Set(
+                            (library?.programs || [])
+                              .filter((program) => program.phase === nextPhase)
+                              .map((program) => program.name)
+                          )
+                        ]
+                          .filter(Boolean)
+                          .sort((left, right) => left.localeCompare(right));
                         setOverviewForm((current) => ({
                           ...current,
-                          phase: event.target.value,
+                          phase: nextPhase,
                           programVariant:
-                            event.target.value === "Prep"
-                              ? prepProgramOptions[0] || standardProgramVariant
-                              : event.target.value === "Eccentrics"
+                            nextPhase === "Eccentrics"
                               ? eccentricProgramVariants.includes(current.programVariant)
                                 ? current.programVariant
                                 : eccentricProgramVariants[0]
-                              : standardProgramVariant
-                        }))
-                      }
+                              : namesForPhase.includes(current.programVariant)
+                                ? current.programVariant
+                                : namesForPhase[0] || standardProgramVariant
+                        }));
+                      }}
                       required
                     >
                       {phaseOptions.map((phase) => (

@@ -12,7 +12,7 @@ services:
     plan: starter
     rootDir: .
     buildCommand: npm install && npm run build
-    startCommand: npm run prisma:push && npm run bootstrap:owner -w server && npm run readiness:recompute -w server && npm run start
+    startCommand: npm run prisma:push && npm run bootstrap:owner -w server && npm run migrate:program-variant -w server && npm run readiness:recompute -w server && npm run start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV

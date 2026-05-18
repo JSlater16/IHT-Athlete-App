@@ -14,6 +14,7 @@
     "prisma:push": "prisma migrate deploy",
     "bootstrap:owner": "node scripts/bootstrapOwner.js",
     "readiness:recompute": "node scripts/recomputeReadiness.js",
+    "migrate:program-variant": "node scripts/migrateProgramVariantToName.js",
     "import:sqlite": "node scripts/importFromSqlite.js",
     "seed:forcedecks": "node scripts/seedForcedecksDemo.js",
     "import:program-csv": "node scripts/importProgramCsv.js",

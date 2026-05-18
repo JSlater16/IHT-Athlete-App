@@ -32,29 +32,40 @@ function getPrepProgramNames(library) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+function getProgramNamesForPhase(library, phase) {
+  return [
+    ...new Set(
+      (library?.programs || [])
+        .filter((program) => program.phase === phase)
+        .map((program) => program.name)
+    )
+  ]
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
+}
+
 function resolveAthleteProgramSelection({
   phase,
   requestedProgramVariant,
   fallbackProgramVariant = "",
   library
 }) {
-  if (phase === "Prep") {
-    const prepProgramNames = getPrepProgramNames(library);
-    const requested = typeof requestedProgramVariant === "string" ? requestedProgramVariant.trim() : "";
-    const fallback = typeof fallbackProgramVariant === "string" ? fallbackProgramVariant.trim() : "";
-
-    if (requested && prepProgramNames.includes(requested)) {
-      return requested;
-    }
-
-    if (fallback && prepProgramNames.includes(fallback)) {
-      return fallback;
-    }
-
-    return prepProgramNames[0] || standardProgramVariant;
+  // Eccentrics keeps the legacy variant-keyed selection because the
+  // Alactic/Lactic split is a meaningful coaching label, not a
+  // program name. Every other phase is now name-keyed so multiple
+  // programs at the same (phase, frequency) slot can coexist and be
+  // picked individually.
+  if (phase === "Eccentrics") {
+    return resolveProgramVariant(phase, requestedProgramVariant || fallbackProgramVariant);
   }
 
-  return resolveProgramVariant(phase, requestedProgramVariant || fallbackProgramVariant);
+  const programNames = getProgramNamesForPhase(library, phase);
+  const requested = typeof requestedProgramVariant === "string" ? requestedProgramVariant.trim() : "";
+  const fallback = typeof fallbackProgramVariant === "string" ? fallbackProgramVariant.trim() : "";
+
+  if (requested && programNames.includes(requested)) return requested;
+  if (fallback && programNames.includes(fallback)) return fallback;
+  return programNames[0] || standardProgramVariant;
 }
 
 async function getAthleteProfileOr404(athleteId, res) {
@@ -809,17 +820,23 @@ router.post("/:id/apply-program", async (req, res, next) => {
     const { weekStart, weekEnd } = getWeekRange(req.body?.week);
     const library = await readProgramLibrary();
     const summary = summarizeProgramLibrary(library);
+    // Eccentrics matches by variant (Alactic/Lactic); everything else
+    // matches by program name so multiple programs at the same
+    // (phase, frequency) slot are distinguishable. Falls back to a
+    // variant match for legacy data where programVariant still holds
+    // the literal "Standard".
     const matchedProgram = library.programs.find((program) => {
-      const programVariant = program.variant || standardProgramVariant;
-      const matchesPrepSelection =
-        athlete.phase === "Prep"
-          ? program.name === athlete.programVariant
-          : programVariant === athlete.programVariant;
-
+      if (program.phase !== athlete.phase) return false;
+      if (Number(program.frequency) !== Number(athlete.programmingDays)) return false;
+      if (athlete.phase === "Eccentrics") {
+        return (program.variant || standardProgramVariant) === athlete.programVariant;
+      }
+      if (program.name === athlete.programVariant) return true;
+      // Legacy fallback: athlete still has programVariant="Standard"
+      // because this phase only ever had one Standard program before.
       return (
-        program.phase === athlete.phase &&
-        matchesPrepSelection &&
-        Number(program.frequency) === Number(athlete.programmingDays)
+        athlete.programVariant === standardProgramVariant &&
+        (program.variant || standardProgramVariant) === standardProgramVariant
       );
     });
 
