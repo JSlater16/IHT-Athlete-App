@@ -4715,6 +4715,339 @@
       "defaultReps": 1,
       "defaultWeight": "BW",
       "defaultNotes": "5 min. Animal flow, ground transitions, exploration."
+    },
+    {
+      "id": "front-foot-elevated-split-squat",
+      "name": "Front-foot elevated split squat",
+      "category": "Squat, single-leg",
+      "defaultSets": 3,
+      "defaultReps": 8,
+      "defaultWeight": "DB moderate",
+      "defaultNotes": "Per side. Controlled."
+    },
+    {
+      "id": "heels-elevated-db-goblet-squat",
+      "name": "Heels-elevated DB goblet squat",
+      "category": "Squat",
+      "defaultSets": 3,
+      "defaultReps": 11,
+      "defaultWeight": "DB moderate-heavy",
+      "defaultNotes": "Reps 10-12. Last set to failure. Subs for leg press."
+    },
+    {
+      "id": "walking-lunge-w-dbs",
+      "name": "Walking lunge w/ DBs",
+      "category": "Squat, single-leg",
+      "defaultSets": 3,
+      "defaultReps": 10,
+      "defaultWeight": "DB moderate",
+      "defaultNotes": "Per side."
+    },
+    {
+      "id": "barbell-hip-thrust",
+      "name": "Barbell hip thrust",
+      "category": "Hinge, glute",
+      "defaultSets": 3,
+      "defaultReps": 9,
+      "defaultWeight": "barbell moderate-heavy",
+      "defaultNotes": "Reps 8-10. Controlled. Glute hypertrophy."
+    },
+    {
+      "id": "box-jump-mid-box-to-stick",
+      "name": "Box jump (mid box) to stick",
+      "category": "Land",
+      "defaultSets": 4,
+      "defaultReps": 3,
+      "defaultWeight": "BW",
+      "defaultNotes": "Max intent, full recovery. Stick the landing."
+    },
+    {
+      "id": "broad-jump-to-stick",
+      "name": "Broad jump to stick",
+      "category": "Land",
+      "defaultSets": 3,
+      "defaultReps": 5,
+      "defaultWeight": "BW",
+      "defaultNotes": "Max intent. Stick the landing."
+    },
+    {
+      "id": "tuck-jump",
+      "name": "Tuck jump",
+      "category": "Land",
+      "defaultSets": 3,
+      "defaultReps": 5,
+      "defaultWeight": "BW",
+      "defaultNotes": "Continuous reps."
+    },
+    {
+      "id": "standing-calf-raise",
+      "name": "Standing calf raise",
+      "category": "Accessory",
+      "defaultSets": 4,
+      "defaultReps": 12,
+      "defaultWeight": "moderate-heavy",
+      "defaultNotes": "Last set to failure."
+    },
+    {
+      "id": "db-incline-bench",
+      "name": "DB incline bench",
+      "category": "Press",
+      "defaultSets": 3,
+      "defaultReps": 9,
+      "defaultWeight": "DB moderate",
+      "defaultNotes": "Reps 8-10. Controlled."
+    },
+    {
+      "id": "weighted-dip",
+      "name": "Weighted dip",
+      "category": "Press",
+      "defaultSets": 3,
+      "defaultReps": 7,
+      "defaultWeight": "weight belt or BW",
+      "defaultNotes": "Reps 6-8."
+    },
+    {
+      "id": "db-shoulder-press",
+      "name": "DB shoulder press",
+      "category": "Press",
+      "defaultSets": 3,
+      "defaultReps": 9,
+      "defaultWeight": "DB moderate",
+      "defaultNotes": "Reps 8-10. Last set to failure."
+    },
+    {
+      "id": "db-lateral-raise",
+      "name": "DB lateral raise",
+      "category": "Shoulder",
+      "defaultSets": 3,
+      "defaultReps": 13,
+      "defaultWeight": "DB light",
+      "defaultNotes": "Reps 12-15. To failure."
+    },
+    {
+      "id": "rear-delt-fly",
+      "name": "Rear delt fly",
+      "category": "Shoulder",
+      "defaultSets": 3,
+      "defaultReps": 13,
+      "defaultWeight": "DB light or cable",
+      "defaultNotes": "Reps 12-15. To failure."
+    },
+    {
+      "id": "cable-tricep-extension",
+      "name": "Cable tricep extension",
+      "category": "Accessory",
+      "defaultSets": 3,
+      "defaultReps": 11,
+      "defaultWeight": "cable moderate",
+      "defaultNotes": "Reps 10-12. To failure."
+    },
+    {
+      "id": "skull-crushers",
+      "name": "Skull crushers",
+      "category": "Accessory",
+      "defaultSets": 3,
+      "defaultReps": 9,
+      "defaultWeight": "EZ bar or DB",
+      "defaultNotes": "Reps 8-10."
+    },
+    {
+      "id": "med-ball-chest-pass",
+      "name": "Med ball chest pass",
+      "category": "Ballistic",
+      "defaultSets": 3,
+      "defaultReps": 5,
+      "defaultWeight": "med ball",
+      "defaultNotes": "Max intent."
+    },
+    {
+      "id": "deadlift-conventional-or-trap-bar",
+      "name": "Deadlift (conventional or trap bar)",
+      "category": "Hinge",
+      "defaultSets": 4,
+      "defaultReps": 6,
+      "defaultWeight": "barbell moderate-heavy",
+      "defaultNotes": "Reps 5-6. Controlled. Add 5-10 lb every 1-2 weeks if reps stay clean."
+    },
+    {
+      "id": "reverse-hyper",
+      "name": "Reverse hyper",
+      "category": "Hinge, posterior chain",
+      "defaultSets": 3,
+      "defaultReps": 11,
+      "defaultWeight": "moderate",
+      "defaultNotes": "Reps 10-12. Posterior chain hypertrophy."
+    },
+    {
+      "id": "single-leg-box-jump-to-stick",
+      "name": "Single-leg box jump to stick",
+      "category": "Land, single-leg",
+      "defaultSets": 3,
+      "defaultReps": 3,
+      "defaultWeight": "BW",
+      "defaultNotes": "Per side. Stick the landing."
+    },
+    {
+      "id": "bounding-for-distance",
+      "name": "Bounding for distance",
+      "category": "Land, dynamic",
+      "defaultSets": 3,
+      "defaultReps": 1,
+      "defaultWeight": "BW",
+      "defaultNotes": "30 yards per set. Alternating legs, max distance per contact."
+    },
+    {
+      "id": "hanging-leg-raise",
+      "name": "Hanging leg raise",
+      "category": "Trunk",
+      "defaultSets": 3,
+      "defaultReps": 13,
+      "defaultWeight": "BW",
+      "defaultNotes": "Reps 12-15."
+    },
+    {
+      "id": "weighted-pull-up",
+      "name": "Weighted pull-up",
+      "category": "Pull",
+      "defaultSets": 4,
+      "defaultReps": 6,
+      "defaultWeight": "weight belt or BW",
+      "defaultNotes": "Reps 5-6. Add weight every 1-2 weeks if reps stay clean."
+    },
+    {
+      "id": "barbell-row",
+      "name": "Barbell row",
+      "category": "Pull",
+      "defaultSets": 4,
+      "defaultReps": 7,
+      "defaultWeight": "barbell moderate-heavy",
+      "defaultNotes": "Reps 6-8. 5-sec eccentric."
+    },
+    {
+      "id": "barbell-or-db-curl",
+      "name": "Barbell or DB curl",
+      "category": "Accessory",
+      "defaultSets": 3,
+      "defaultReps": 11,
+      "defaultWeight": "moderate",
+      "defaultNotes": "Reps 10-12. To failure."
+    },
+    {
+      "id": "hammer-curl",
+      "name": "Hammer curl",
+      "category": "Accessory",
+      "defaultSets": 3,
+      "defaultReps": 11,
+      "defaultWeight": "DB moderate",
+      "defaultNotes": "Reps 10-12. To failure."
+    },
+    {
+      "id": "barbell-shrug",
+      "name": "Barbell shrug",
+      "category": "Accessory, traps",
+      "defaultSets": 3,
+      "defaultReps": 13,
+      "defaultWeight": "barbell moderate-heavy",
+      "defaultNotes": "Reps 12-15."
+    },
+    {
+      "id": "heavy-farmer-carry",
+      "name": "Heavy farmer carry",
+      "category": "Carry",
+      "defaultSets": 3,
+      "defaultReps": 1,
+      "defaultWeight": "heavy DB or trap bar",
+      "defaultNotes": "30 yards per set."
+    },
+    {
+      "id": "depth-jump-to-max-vertical",
+      "name": "Depth jump to max vertical",
+      "category": "Land, reactive",
+      "defaultSets": 4,
+      "defaultReps": 3,
+      "defaultWeight": "BW (12-18 in box)",
+      "defaultNotes": "Max intent, full recovery. Reactive — short ground contact, jump as high as possible."
+    },
+    {
+      "id": "box-jump-high-to-stick",
+      "name": "Box jump (high) to stick",
+      "category": "Land",
+      "defaultSets": 3,
+      "defaultReps": 3,
+      "defaultWeight": "BW",
+      "defaultNotes": "Max intent. Stick the landing."
+    },
+    {
+      "id": "pause-squat",
+      "name": "Pause squat",
+      "category": "Squat",
+      "defaultSets": 3,
+      "defaultReps": 3,
+      "defaultWeight": "75% 1RM",
+      "defaultNotes": "1-sec bottom pause. Build toward 2-sec by Wk 6 if loads still moving."
+    },
+    {
+      "id": "med-ball-overhead-toss",
+      "name": "Med ball overhead toss",
+      "category": "Ballistic",
+      "defaultSets": 3,
+      "defaultReps": 5,
+      "defaultWeight": "med ball",
+      "defaultNotes": "Max intent."
+    },
+    {
+      "id": "push-press",
+      "name": "Push press",
+      "category": "Press, power",
+      "defaultSets": 3,
+      "defaultReps": 4,
+      "defaultWeight": "barbell heavy",
+      "defaultNotes": "Reps 3-5. Explosive, heavy. Use leg drive."
+    },
+    {
+      "id": "strict-ohp",
+      "name": "Strict OHP",
+      "category": "Press",
+      "defaultSets": 4,
+      "defaultReps": 5,
+      "defaultWeight": "barbell moderate-heavy",
+      "defaultNotes": "Strict — no leg drive."
+    },
+    {
+      "id": "tricep-extension",
+      "name": "Tricep extension",
+      "category": "Accessory",
+      "defaultSets": 3,
+      "defaultReps": 8,
+      "defaultWeight": "cable or DB heavy",
+      "defaultNotes": "Heavier than P1."
+    },
+    {
+      "id": "depth-drop-to-broad-jump",
+      "name": "Depth drop to broad jump",
+      "category": "Land, reactive",
+      "defaultSets": 3,
+      "defaultReps": 3,
+      "defaultWeight": "BW",
+      "defaultNotes": "Reactive. Drop and explode out."
+    },
+    {
+      "id": "pause-deadlift",
+      "name": "Pause deadlift",
+      "category": "Hinge",
+      "defaultSets": 3,
+      "defaultReps": 3,
+      "defaultWeight": "moderate-heavy",
+      "defaultNotes": "1-sec pause at knee. Build toward 2-sec by Wk 6 if loads still moving."
+    },
+    {
+      "id": "pendlay-row",
+      "name": "Pendlay row",
+      "category": "Pull",
+      "defaultSets": 3,
+      "defaultReps": 5,
+      "defaultWeight": "barbell moderate-heavy",
+      "defaultNotes": "Each rep starts from the floor. Explosive concentric."
     }
   ],
   "programs": [
@@ -19682,6 +20015,702 @@
               "reps": 10,
               "weight": "BW",
               "notes": "60 bpm cadence."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hypertrophy-foundation-strength",
+      "name": "Program 1 - Hypertrophy + Foundation Strength",
+      "phase": "Prep",
+      "variant": "Standard",
+      "frequency": 4,
+      "days": [
+        {
+          "dayOffset": 0,
+          "dayLabel": "Lower A: Squat-Dominant",
+          "lifts": [
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Back squat",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 7,
+              "weight": "moderate-heavy barbell",
+              "notes": "Reps 6-8. 5-sec eccentric, controlled concentric. Add 5-10 lb every 1-2 weeks if reps stay clean."
+            },
+            {
+              "liftId": "front-foot-elevated-split-squat",
+              "exerciseName": "Front-foot elevated split squat",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 8,
+              "weight": "DB moderate",
+              "notes": "Per side. Controlled."
+            },
+            {
+              "liftId": "heels-elevated-db-goblet-squat",
+              "exerciseName": "Heels-elevated DB goblet squat",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 11,
+              "weight": "DB moderate-heavy",
+              "notes": "Reps 10-12. Last set to failure. Subs for leg press."
+            },
+            {
+              "liftId": "walking-lunge-w-dbs",
+              "exerciseName": "Walking lunge w/ DBs",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 10,
+              "weight": "DB moderate",
+              "notes": "Per side."
+            },
+            {
+              "liftId": "barbell-hip-thrust",
+              "exerciseName": "Barbell hip thrust",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 9,
+              "weight": "barbell moderate-heavy",
+              "notes": "Reps 8-10. Controlled. Glute hypertrophy."
+            },
+            {
+              "liftId": "box-jump-mid-box-to-stick",
+              "exerciseName": "Box jump (mid box) to stick",
+              "blockLabel": "Block 3",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent, full recovery. Stick the landing."
+            },
+            {
+              "liftId": "broad-jump-to-stick",
+              "exerciseName": "Broad jump to stick",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Max intent. Stick the landing."
+            },
+            {
+              "liftId": "tuck-jump",
+              "exerciseName": "Tuck jump",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Continuous reps."
+            },
+            {
+              "liftId": "standing-calf-raise",
+              "exerciseName": "Standing calf raise",
+              "blockLabel": "Block 4",
+              "sets": 4,
+              "reps": 12,
+              "weight": "moderate-heavy",
+              "notes": "Last set to failure."
+            }
+          ]
+        },
+        {
+          "dayOffset": 1,
+          "dayLabel": "Upper A: Push-Dominant",
+          "lifts": [
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Bench press",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 7,
+              "weight": "barbell moderate-heavy",
+              "notes": "Reps 6-8. 5-sec eccentric. Add 5-10 lb every 1-2 weeks if reps stay clean."
+            },
+            {
+              "liftId": "db-incline-bench",
+              "exerciseName": "DB incline bench",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 9,
+              "weight": "DB moderate",
+              "notes": "Reps 8-10. Controlled."
+            },
+            {
+              "liftId": "weighted-dip",
+              "exerciseName": "Weighted dip",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 7,
+              "weight": "weight belt or BW",
+              "notes": "Reps 6-8."
+            },
+            {
+              "liftId": "db-shoulder-press",
+              "exerciseName": "DB shoulder press",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 9,
+              "weight": "DB moderate",
+              "notes": "Reps 8-10. Last set to failure."
+            },
+            {
+              "liftId": "db-lateral-raise",
+              "exerciseName": "DB lateral raise",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 13,
+              "weight": "DB light",
+              "notes": "Reps 12-15. To failure."
+            },
+            {
+              "liftId": "rear-delt-fly",
+              "exerciseName": "Rear delt fly",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 13,
+              "weight": "DB light or cable",
+              "notes": "Reps 12-15. To failure."
+            },
+            {
+              "liftId": "cable-tricep-extension",
+              "exerciseName": "Cable tricep extension",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 11,
+              "weight": "cable moderate",
+              "notes": "Reps 10-12. To failure."
+            },
+            {
+              "liftId": "skull-crushers",
+              "exerciseName": "Skull crushers",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 9,
+              "weight": "EZ bar or DB",
+              "notes": "Reps 8-10."
+            },
+            {
+              "liftId": "med-ball-chest-pass",
+              "exerciseName": "Med ball chest pass",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "push-up",
+              "exerciseName": "Push-up",
+              "blockLabel": "Block 4",
+              "sets": 2,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "Max reps to failure."
+            }
+          ]
+        },
+        {
+          "dayOffset": 3,
+          "dayLabel": "Lower B: Hinge-Dominant",
+          "lifts": [
+            {
+              "liftId": "deadlift-conventional-or-trap-bar",
+              "exerciseName": "Deadlift (conventional or trap bar)",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 6,
+              "weight": "barbell moderate-heavy",
+              "notes": "Reps 5-6. Controlled. Add 5-10 lb every 1-2 weeks if reps stay clean."
+            },
+            {
+              "liftId": "rdl",
+              "exerciseName": "RDL",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 8,
+              "weight": "barbell moderate",
+              "notes": "5-sec eccentric."
+            },
+            {
+              "liftId": "bulgarian-split-squat",
+              "exerciseName": "Bulgarian split squat",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 8,
+              "weight": "DB moderate",
+              "notes": "Per side."
+            },
+            {
+              "liftId": "glute-ham-raise",
+              "exerciseName": "Glute-ham raise",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 7,
+              "weight": "BW or weighted",
+              "notes": "Reps 6-8."
+            },
+            {
+              "liftId": "reverse-hyper",
+              "exerciseName": "Reverse hyper",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 11,
+              "weight": "moderate",
+              "notes": "Reps 10-12. Posterior chain hypertrophy."
+            },
+            {
+              "liftId": "lateral-bound-to-stick",
+              "exerciseName": "Lateral bound to stick",
+              "blockLabel": "Block 3",
+              "sets": 4,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Max intent. Stick the landing."
+            },
+            {
+              "liftId": "single-leg-box-jump-to-stick",
+              "exerciseName": "Single-leg box jump to stick",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Per side. Stick the landing."
+            },
+            {
+              "liftId": "bounding-for-distance",
+              "exerciseName": "Bounding for distance",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "30 yards per set. Alternating legs, max distance per contact."
+            },
+            {
+              "liftId": "hanging-leg-raise",
+              "exerciseName": "Hanging leg raise",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 13,
+              "weight": "BW",
+              "notes": "Reps 12-15."
+            }
+          ]
+        },
+        {
+          "dayOffset": 4,
+          "dayLabel": "Upper B: Pull-Dominant",
+          "lifts": [
+            {
+              "liftId": "weighted-pull-up",
+              "exerciseName": "Weighted pull-up",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 6,
+              "weight": "weight belt or BW",
+              "notes": "Reps 5-6. Add weight every 1-2 weeks if reps stay clean."
+            },
+            {
+              "liftId": "barbell-row",
+              "exerciseName": "Barbell row",
+              "blockLabel": "Block 2",
+              "sets": 4,
+              "reps": 7,
+              "weight": "barbell moderate-heavy",
+              "notes": "Reps 6-8. 5-sec eccentric."
+            },
+            {
+              "liftId": "lat-pulldown",
+              "exerciseName": "Lat pulldown",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 11,
+              "weight": "cable moderate",
+              "notes": "Reps 10-12. Controlled."
+            },
+            {
+              "liftId": "db-row",
+              "exerciseName": "DB row",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 9,
+              "weight": "DB moderate",
+              "notes": "Reps 8-10 per side."
+            },
+            {
+              "liftId": "face-pulls",
+              "exerciseName": "Face pulls",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 13,
+              "weight": "cable light",
+              "notes": "Reps 12-15. To failure."
+            },
+            {
+              "liftId": "barbell-or-db-curl",
+              "exerciseName": "Barbell or DB curl",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 11,
+              "weight": "moderate",
+              "notes": "Reps 10-12. To failure."
+            },
+            {
+              "liftId": "hammer-curl",
+              "exerciseName": "Hammer curl",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 11,
+              "weight": "DB moderate",
+              "notes": "Reps 10-12. To failure."
+            },
+            {
+              "liftId": "barbell-shrug",
+              "exerciseName": "Barbell shrug",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 13,
+              "weight": "barbell moderate-heavy",
+              "notes": "Reps 12-15."
+            },
+            {
+              "liftId": "heavy-farmer-carry",
+              "exerciseName": "Heavy farmer carry",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 1,
+              "weight": "heavy DB or trap bar",
+              "notes": "30 yards per set."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "max-strength-power",
+      "name": "Program 2 - Max Strength + Power",
+      "phase": "Power",
+      "variant": "Standard",
+      "frequency": 4,
+      "days": [
+        {
+          "dayOffset": 0,
+          "dayLabel": "Lower A: Squat + Vertical Power",
+          "lifts": [
+            {
+              "liftId": "depth-jump-to-max-vertical",
+              "exerciseName": "Depth jump to max vertical",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW (12-18 in box)",
+              "notes": "Max intent, full recovery. Reactive — short ground contact, jump as high as possible."
+            },
+            {
+              "liftId": "box-jump-high-to-stick",
+              "exerciseName": "Box jump (high) to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent. Stick the landing."
+            },
+            {
+              "liftId": "loaded-squat-jump",
+              "exerciseName": "Loaded squat jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "DB or vest ~10% BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Back squat",
+              "blockLabel": "Block 2",
+              "sets": 8,
+              "reps": 3,
+              "weight": "80-85% 1RM",
+              "notes": "Cluster: many straight sets, ~2 min rest. Build to 85-90% by Wk 6-8 if reps stay clean."
+            },
+            {
+              "liftId": "pause-squat",
+              "exerciseName": "Pause squat",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 3,
+              "weight": "75% 1RM",
+              "notes": "1-sec bottom pause. Build toward 2-sec by Wk 6 if loads still moving."
+            },
+            {
+              "liftId": "bulgarian-split-squat",
+              "exerciseName": "Bulgarian split squat",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "DB heavy",
+              "notes": "Per side. Heavier than P1."
+            },
+            {
+              "liftId": "barbell-hip-thrust",
+              "exerciseName": "Barbell hip thrust",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 7,
+              "weight": "barbell heavy",
+              "notes": "Reps 6-8. Heavy hip thrust."
+            },
+            {
+              "liftId": "standing-calf-raise",
+              "exerciseName": "Standing calf raise",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "heavy",
+              "notes": "Heavy load, lower reps."
+            }
+          ]
+        },
+        {
+          "dayOffset": 1,
+          "dayLabel": "Upper A: Push Strength",
+          "lifts": [
+            {
+              "liftId": "med-ball-chest-pass",
+              "exerciseName": "Med ball chest pass",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent primer."
+            },
+            {
+              "liftId": "med-ball-overhead-toss",
+              "exerciseName": "Med ball overhead toss",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Bench press",
+              "blockLabel": "Block 2",
+              "sets": 8,
+              "reps": 3,
+              "weight": "80-85% 1RM",
+              "notes": "Cluster: many straight sets, ~2 min rest. Build to 85-90% by Wk 6-8 if reps stay clean."
+            },
+            {
+              "liftId": "push-press",
+              "exerciseName": "Push press",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 4,
+              "weight": "barbell heavy",
+              "notes": "Reps 3-5. Explosive, heavy. Use leg drive."
+            },
+            {
+              "liftId": "weighted-dip",
+              "exerciseName": "Weighted dip",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "weight belt",
+              "notes": "Heavy."
+            },
+            {
+              "liftId": "strict-ohp",
+              "exerciseName": "Strict OHP",
+              "blockLabel": "Block 3",
+              "sets": 4,
+              "reps": 5,
+              "weight": "barbell moderate-heavy",
+              "notes": "Strict — no leg drive."
+            },
+            {
+              "liftId": "skull-crushers",
+              "exerciseName": "Skull crushers",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 7,
+              "weight": "EZ bar or DB",
+              "notes": "Reps 6-8."
+            },
+            {
+              "liftId": "tricep-extension",
+              "exerciseName": "Tricep extension",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "cable or DB heavy",
+              "notes": "Heavier than P1."
+            }
+          ]
+        },
+        {
+          "dayOffset": 3,
+          "dayLabel": "Lower B: Hinge + Horizontal Power",
+          "lifts": [
+            {
+              "liftId": "broad-jump-to-stick",
+              "exerciseName": "Broad jump to stick",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent primer. Stick the landing."
+            },
+            {
+              "liftId": "lateral-bound-to-stick",
+              "exerciseName": "Lateral bound to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Heavier athlete, longer distance."
+            },
+            {
+              "liftId": "depth-drop-to-broad-jump",
+              "exerciseName": "Depth drop to broad jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Reactive. Drop and explode out."
+            },
+            {
+              "liftId": "bounding-for-distance",
+              "exerciseName": "Bounding for distance",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "30 yards per set. Alternating legs, max distance per contact."
+            },
+            {
+              "liftId": "deadlift-conventional-or-trap-bar",
+              "exerciseName": "Deadlift (conventional or trap bar)",
+              "blockLabel": "Block 2",
+              "sets": 8,
+              "reps": 3,
+              "weight": "80-85% 1RM",
+              "notes": "Cluster: many straight sets. Reps 2-3. Build to 85-90% by Wk 6-8."
+            },
+            {
+              "liftId": "pause-deadlift",
+              "exerciseName": "Pause deadlift",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 3,
+              "weight": "moderate-heavy",
+              "notes": "1-sec pause at knee. Build toward 2-sec by Wk 6 if loads still moving."
+            },
+            {
+              "liftId": "single-leg-rdl",
+              "exerciseName": "Single-leg RDL",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "DB moderate-heavy",
+              "notes": "Per side. Heavier than P1."
+            },
+            {
+              "liftId": "reverse-hyper",
+              "exerciseName": "Reverse hyper",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 9,
+              "weight": "heavy",
+              "notes": "Reps 8-10. Heavy posterior chain."
+            },
+            {
+              "liftId": "heavy-farmer-carry",
+              "exerciseName": "Heavy farmer carry",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 1,
+              "weight": "heavy DB or trap bar",
+              "notes": "30 yards per set. Heavier than P1."
+            }
+          ]
+        },
+        {
+          "dayOffset": 4,
+          "dayLabel": "Upper B: Pull Strength",
+          "lifts": [
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent primer."
+            },
+            {
+              "liftId": "weighted-pull-up",
+              "exerciseName": "Weighted pull-up",
+              "blockLabel": "Block 2",
+              "sets": 5,
+              "reps": 4,
+              "weight": "weight belt",
+              "notes": "Reps 3-5. Heavy."
+            },
+            {
+              "liftId": "barbell-row",
+              "exerciseName": "Barbell row",
+              "blockLabel": "Block 3",
+              "sets": 6,
+              "reps": 4,
+              "weight": "barbell moderate-heavy",
+              "notes": "Cluster. Reps 3-5."
+            },
+            {
+              "liftId": "pendlay-row",
+              "exerciseName": "Pendlay row",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "barbell moderate-heavy",
+              "notes": "Each rep starts from the floor. Explosive concentric."
+            },
+            {
+              "liftId": "single-arm-db-row",
+              "exerciseName": "Single-arm DB row",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "DB heavy",
+              "notes": "Per side."
+            },
+            {
+              "liftId": "db-shrug",
+              "exerciseName": "DB shrug",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 7,
+              "weight": "DB heavy",
+              "notes": "Reps 6-8. Heavy DBs."
+            },
+            {
+              "liftId": "barbell-or-db-curl",
+              "exerciseName": "Barbell or DB curl",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "moderate-heavy",
+              "notes": "Heavier than P1."
+            },
+            {
+              "liftId": "hammer-curl",
+              "exerciseName": "Hammer curl",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 7,
+              "weight": "DB heavy",
+              "notes": "Reps 6-8. Heavy."
             }
           ]
         }

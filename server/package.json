@@ -18,6 +18,7 @@
     "seed:forcedecks": "node scripts/seedForcedecksDemo.js",
     "import:program-csv": "node scripts/importProgramCsv.js",
     "import:program-folder": "node scripts/importProgramFolder.js",
+    "import:program-structured-csv": "node scripts/importStructuredProgramCsv.js",
     "seed": "prisma db seed"
   },
   "dependencies": {
