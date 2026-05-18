@@ -262,6 +262,56 @@ router.post("/recompute-readiness", requireCoach, async (req, res, next) => {
   }
 });
 
+// GET /api/forcedecks/readiness-status — coach-only roster scan.
+// Returns, per athlete with at least one CMJ test, their latest
+// test's status: how many priors are inside the 14-day window and
+// whether they qualify for a real score under the spec'd rule
+// (N >= 2 in 14 days).
+router.get("/readiness-status", requireCoach, async (req, res, next) => {
+  try {
+    const profiles = await prisma.athleteProfile.findMany({
+      where: { user: { isActive: true } },
+      select: { id: true, user: { select: { name: true } } }
+    });
+
+    const rows = [];
+    for (const p of profiles) {
+      const latest = await prisma.forceDecksTest.findFirst({
+        where: { athleteId: p.id },
+        orderBy: { testDate: "desc" },
+        select: { id: true, testDate: true, readinessScore: true, readinessDetails: true }
+      });
+      if (!latest) continue;
+
+      const cutoff = new Date(
+        latest.testDate.getTime() - BASELINE_WINDOW_DAYS * 24 * 60 * 60 * 1000
+      );
+      const priorsIn14d = await prisma.forceDecksTest.count({
+        where: {
+          athleteId: p.id,
+          id: { not: latest.id },
+          testDate: { gte: cutoff, lt: latest.testDate }
+        }
+      });
+      rows.push({
+        athleteId: p.id,
+        name: p.user.name,
+        latestTestDate: latest.testDate,
+        readinessScore: latest.readinessScore,
+        status: latest.readinessDetails?.status || "unknown",
+        priorsIn14d,
+        eligible: priorsIn14d >= 2
+      });
+    }
+
+    rows.sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.priorsIn14d - a.priorsIn14d);
+    const eligibleCount = rows.filter((r) => r.eligible).length;
+    return res.json({ totalWithAnyTest: rows.length, eligibleCount, rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // GET /api/forcedecks/diagnose/:athleteId — coach-only readiness
 // diagnostic. Returns enough to see exactly why a score is null:
 // today's metrics, prior count in 14d window, and the calculator's
