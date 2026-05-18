@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { amitMuscles } from "../../data/amitMuscles";
 import { muscleFrequencies } from "../../data/muscleFrequencies";
 import { apiRequest } from "../../lib/api";
+import LiftTable from "../../components/LiftTable";
 import {
   buildWeekDays,
   formatCalendarDate,
@@ -284,11 +285,29 @@ export default function CoachAthleteProfilePage() {
   const [loading, setLoading] = useState(true);
   const statusTimerRef = useRef(null);
   const muscleSuggestionRefs = useRef({});
+  // Mirror of weeklyLifts so blur-fired save handlers always see the
+  // latest optimistic state without closing over a stale snapshot.
+  const weeklyLiftsRef = useRef([]);
+  useEffect(() => {
+    weeklyLiftsRef.current = weeklyLifts;
+  }, [weeklyLifts]);
 
   const weekDays = useMemo(() => buildWeekDays(weekStart), [weekStart]);
   const liftsByDate = useMemo(() => groupLiftsByDate(weeklyLifts), [weeklyLifts]);
   const selectedDateKey = toDateInputValue(selectedDay);
   const selectedDayLifts = liftsByDate[selectedDateKey] || [];
+  // Chronological "Day 1, Day 2, ..." mapping across only the dates
+  // the athlete actually has lifts on. Matches the labeling the
+  // athlete sees on their home page.
+  const trainingDayMap = useMemo(() => {
+    return Object.entries(liftsByDate)
+      .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+      .map(([key, lifts], index) => ({
+        key,
+        date: new Date(lifts[0].date),
+        dayNumber: index + 1
+      }));
+  }, [liftsByDate]);
   const modelOptions = fallbackModelOptions;
   // Program names present in the library for the currently-selected
   // phase. The picker uses these for every non-Eccentrics phase so
@@ -544,21 +563,36 @@ export default function CoachAthleteProfilePage() {
     }
   }
 
-  async function handleUpdateLift(lift) {
+  async function commitLiftField(liftId, field, rawValue) {
     setError("");
-
+    const lift = weeklyLiftsRef.current.find((l) => l.id === liftId);
+    if (!lift) return;
+    const value =
+      field === "sets" || field === "reps"
+        ? Number(rawValue) || 1
+        : rawValue;
+    // Skip the PUT when the optimistic state already matches what's
+    // on the server — avoids a network round-trip on focus-only blurs.
+    if (lift[field] === value) return;
     try {
-      await apiRequest(`/api/athletes/${athleteId}/lifts/${lift.id}`, {
+      const payload = {
+        ...lift,
+        [field]: value,
+        sets: field === "sets" ? Number(value) || 1 : Number(lift.sets),
+        reps: field === "reps" ? Number(value) || 1 : Number(lift.reps),
+        date: toDateInputValue(lift.date)
+      };
+      const data = await apiRequest(`/api/athletes/${athleteId}/lifts/${liftId}`, {
         method: "PUT",
         token,
-        body: {
-          ...lift,
-          sets: Number(lift.sets),
-          reps: Number(lift.reps),
-          date: toDateInputValue(lift.date)
-        }
+        body: payload
       });
-      showStatus("Lift updated.");
+      const saved = data?.lift;
+      if (saved) {
+        setWeeklyLifts((current) =>
+          current.map((l) => (l.id === liftId ? { ...l, ...saved } : l))
+        );
+      }
     } catch (updateError) {
       setError(updateError.message);
     }
@@ -576,6 +610,52 @@ export default function CoachAthleteProfilePage() {
       showStatus("Lift removed.");
     } catch (deleteError) {
       setError(deleteError.message);
+    }
+  }
+
+  async function handleAddLiftForSelectedDay() {
+    setError("");
+    try {
+      const data = await apiRequest(`/api/athletes/${athleteId}/lifts`, {
+        method: "POST",
+        token,
+        body: {
+          date: toDateInputValue(selectedDay),
+          blockLabel: "Block 1",
+          exerciseName: "New lift",
+          sets: 3,
+          reps: 5,
+          weight: "Coach Prescribed",
+          notes: ""
+        }
+      });
+      const created = data?.lift;
+      if (created) setWeeklyLifts((current) => [...current, created]);
+      showStatus("Lift added.");
+    } catch (addError) {
+      setError(addError.message);
+    }
+  }
+
+  async function handleMoveLift(liftId, direction) {
+    setError("");
+    try {
+      const data = await apiRequest(
+        `/api/athletes/${athleteId}/lifts/${liftId}/reorder`,
+        {
+          method: "PATCH",
+          token,
+          body: { direction: direction < 0 ? "up" : "down" }
+        }
+      );
+      const swapped = data?.lifts || [];
+      if (swapped.length === 0) return;
+      const swappedById = new Map(swapped.map((l) => [l.id, l]));
+      setWeeklyLifts((current) =>
+        current.map((l) => (swappedById.has(l.id) ? { ...l, ...swappedById.get(l.id) } : l))
+      );
+    } catch (moveError) {
+      setError(moveError.message);
     }
   }
 
@@ -1192,17 +1272,23 @@ export default function CoachAthleteProfilePage() {
                 </div>
 
                 <div className="date-strip desktop-strip">
-                  {weekDays.map((day) => (
-                    <button
-                      key={toDateInputValue(day)}
-                      className={`date-pill ${sameDay(day, selectedDay) ? "is-active" : ""}`}
-                      type="button"
-                      onClick={() => setSelectedDay(day)}
-                    >
-                      <span>{formatDayShort(day)}</span>
-                      <strong>{formatMonthDay(day)}</strong>
-                    </button>
-                  ))}
+                  {trainingDayMap.length === 0 ? (
+                    <p className="muted-copy compact-copy">
+                      No lifts assigned this week yet. Apply a program or add lifts manually below.
+                    </p>
+                  ) : (
+                    trainingDayMap.map(({ key, date, dayNumber }) => (
+                      <button
+                        key={key}
+                        className={`date-pill ${sameDay(date, selectedDay) ? "is-active" : ""}`}
+                        type="button"
+                        onClick={() => setSelectedDay(date)}
+                      >
+                        <span>Day {dayNumber}</span>
+                        <strong>{formatMonthDay(date)}</strong>
+                      </button>
+                    ))
+                  )}
                 </div>
 
                 <div className="day-program-header">
@@ -1210,95 +1296,48 @@ export default function CoachAthleteProfilePage() {
                     <p className="eyebrow">Selected Day</p>
                     <h3>{formatLongDate(selectedDay)}</h3>
                   </div>
+                  <button
+                    type="button"
+                    className="primary-button desktop-button builder-add-lift"
+                    onClick={handleAddLiftForSelectedDay}
+                  >
+                    + Add lift
+                  </button>
                 </div>
 
-                <div className="lift-editor-list">
-                  {selectedDayLifts.length === 0 ? (
-                    <p className="empty-state">No lifts assigned for this day yet.</p>
-                  ) : (
-                    selectedDayLifts.map((lift) => (
-                      <article key={lift.id} className="lift-editor-card">
-                        <div className="lift-editor-grid">
-                          <label className="field">
-                            <span>Exercise</span>
-                            <input
-                              type="text"
-                              value={lift.exerciseName}
-                              onChange={(event) =>
-                                updateLiftField(lift.id, "exerciseName", event.target.value)
-                              }
-                            />
-                          </label>
-
-                          <label className="field">
-                            <span>Sets</span>
-                            <input
-                              type="number"
-                              min="1"
-                              value={lift.sets}
-                              onChange={(event) => updateLiftField(lift.id, "sets", event.target.value)}
-                            />
-                          </label>
-
-                          <label className="field">
-                            <span>Reps</span>
-                            <input
-                              type="number"
-                              min="1"
-                              value={lift.reps}
-                              onChange={(event) => updateLiftField(lift.id, "reps", event.target.value)}
-                            />
-                          </label>
-
-                          <label className="field">
-                            <span>Weight</span>
-                            <input
-                              type="text"
-                              value={lift.weight}
-                              onChange={(event) => updateLiftField(lift.id, "weight", event.target.value)}
-                            />
-                          </label>
-
-                          <label className="field">
-                            <span>Workout block</span>
-                            <select
-                              value={lift.blockLabel || "Block 1"}
-                              onChange={(event) => updateLiftField(lift.id, "blockLabel", event.target.value)}
-                            >
-                              {workoutPlacementOptions.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <label className="field field-full">
-                            <span>Notes</span>
-                            <textarea
-                              rows="3"
-                              value={lift.notes || ""}
-                              onChange={(event) => updateLiftField(lift.id, "notes", event.target.value)}
-                            />
-                          </label>
-                        </div>
-
-                        <div className="card-actions">
-                          <button className="ghost-button" type="button" onClick={() => handleDeleteLift(lift.id)}>
-                            Delete
-                          </button>
-                          <button
-                            className="primary-button desktop-button"
-                            type="button"
-                            onClick={() => handleUpdateLift(lift)}
-                          >
-                            Save lift
-                          </button>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
+                <LiftTable
+                  entries={selectedDayLifts.map((lift, idx) => ({
+                    dayIndex: 0,
+                    liftIndex: idx,
+                    lift: {
+                      blockLabel: lift.blockLabel || "Block 1",
+                      exerciseName: lift.exerciseName || "",
+                      sets: String(lift.sets ?? ""),
+                      reps: String(lift.reps ?? ""),
+                      weight: lift.weight || "",
+                      notes: lift.notes || ""
+                    },
+                    liftsInDay: selectedDayLifts.length
+                  }))}
+                  library={library}
+                  liftByNormalizedName={null}
+                  onUpdateLiftField={(_dayIdx, liftIdx, field, value) => {
+                    const target = selectedDayLifts[liftIdx];
+                    if (target) updateLiftField(target.id, field, value);
+                  }}
+                  onCommitField={(_dayIdx, liftIdx, field, value) => {
+                    const target = selectedDayLifts[liftIdx];
+                    if (target) commitLiftField(target.id, field, value);
+                  }}
+                  onRemoveLift={(_dayIdx, liftIdx) => {
+                    const target = selectedDayLifts[liftIdx];
+                    if (target) handleDeleteLift(target.id);
+                  }}
+                  onMoveLift={(_dayIdx, liftIdx, direction) => {
+                    const target = selectedDayLifts[liftIdx];
+                    if (target) handleMoveLift(target.id, direction);
+                  }}
+                />
               </section>
 
               <div className="program-side-stack">

@@ -4,7 +4,6 @@ import { apiRequest } from "../../lib/api";
 import { SkeletonDatePill, SkeletonLiftCard } from "../../components/Skeleton";
 import {
   buildWorkoutDayGroups,
-  formatCalendarDate,
   groupLiftsByBlock,
   startOfWeek,
   toDateInputValue
@@ -161,8 +160,7 @@ export default function AthleteHomePage() {
               type="button"
               onClick={() => setSelectedDayKey(day.key)}
             >
-              <span>{day.label}</span>
-              <strong>{formatCalendarDate(day.date)}</strong>
+              <strong>{day.label}</strong>
             </button>
           ))
         )}
@@ -173,9 +171,6 @@ export default function AthleteHomePage() {
           <div>
             <p className="eyebrow">Selected Training Day</p>
             <h2>{selectedWorkoutDay ? selectedWorkoutDay.label : "No workout day selected"}</h2>
-            {selectedWorkoutDay ? (
-              <p className="muted-copy compact-copy">{formatCalendarDate(selectedWorkoutDay.date)}</p>
-            ) : null}
           </div>
         </div>
 

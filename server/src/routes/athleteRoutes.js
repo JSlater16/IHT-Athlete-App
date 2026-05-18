@@ -635,6 +635,55 @@ router.delete("/:id/lifts/:liftId", async (req, res, next) => {
   }
 });
 
+// Swap a lift's orderIndex with its neighbor in the same (athleteId,
+// date) bucket. Body: { direction: "up" | "down" }. The neighbor is
+// chosen from the same day's lifts sorted by (orderIndex, createdAt)
+// — what the athlete actually sees on their training-day view.
+router.patch("/:id/lifts/:liftId/reorder", async (req, res, next) => {
+  try {
+    const athlete = await getAthleteProfileOr404(req.params.id, res);
+    if (!athlete) return;
+
+    const direction = req.body?.direction;
+    if (direction !== "up" && direction !== "down") {
+      return res.status(400).json({ error: "direction must be 'up' or 'down'." });
+    }
+
+    const target = await prisma.lift.findFirst({
+      where: { id: req.params.liftId, athleteId: athlete.id }
+    });
+    if (!target) return res.status(404).json({ error: "Lift not found." });
+
+    const sameDay = await prisma.lift.findMany({
+      where: { athleteId: athlete.id, date: target.date },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+    });
+    const idx = sameDay.findIndex((l) => l.id === target.id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sameDay.length) {
+      return res.status(400).json({ error: "Already at the boundary." });
+    }
+
+    const neighbor = sameDay[swapIdx];
+    const [updatedTarget, updatedNeighbor] = await prisma.$transaction([
+      prisma.lift.update({
+        where: { id: target.id },
+        data: { orderIndex: neighbor.orderIndex }
+      }),
+      prisma.lift.update({
+        where: { id: neighbor.id },
+        data: { orderIndex: target.orderIndex }
+      })
+    ]);
+
+    return res.json({
+      lifts: [serializeLift(updatedTarget), serializeLift(updatedNeighbor)]
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post("/:id/rehab", async (req, res, next) => {
   try {
     const athlete = await getAthleteProfileOr404(req.params.id, res);
