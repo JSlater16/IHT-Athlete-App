@@ -7,6 +7,7 @@ const { serializeLift } = require("../utils/formatters");
 const { buildPhaseTimeline } = require("../utils/phasePlan");
 const { standardProgramVariant } = require("../utils/programVariant");
 const { enrichLiftBlocks } = require("../utils/liftBlocks");
+const { attachLastLoggedWeight } = require("../utils/liftHistory");
 const { parseRehabProfile } = require("../utils/rehabProfile");
 const { validatePassword } = require("../utils/password");
 const { passwordChangeLimiter } = require("../utils/rateLimiters");
@@ -81,8 +82,9 @@ router.get("/lifts", async (req, res, next) => {
       weekStart,
       library
     });
+    const withHistory = await attachLastLoggedWeight(enrichedLifts);
 
-    return res.json({ lifts: enrichedLifts.map(serializeLift) });
+    return res.json({ lifts: withHistory.map(serializeLift) });
   } catch (error) {
     return next(error);
   }
@@ -95,8 +97,26 @@ router.put("/lifts/:liftId", async (req, res, next) => {
       return;
     }
 
-    if (typeof req.body?.completed !== "boolean") {
-      return res.status(400).json({ error: "Completed must be true or false." });
+    const body = req.body || {};
+    const update = {};
+    if ("completed" in body) {
+      if (typeof body.completed !== "boolean") {
+        return res.status(400).json({ error: "Completed must be true or false." });
+      }
+      update.completed = body.completed;
+    }
+    if ("loggedWeight" in body) {
+      if (body.loggedWeight !== null && typeof body.loggedWeight !== "string") {
+        return res.status(400).json({ error: "loggedWeight must be a string or null." });
+      }
+      const trimmed = typeof body.loggedWeight === "string" ? body.loggedWeight.trim() : null;
+      if (trimmed !== null && trimmed.length > 64) {
+        return res.status(400).json({ error: "loggedWeight is too long (max 64 chars)." });
+      }
+      update.loggedWeight = trimmed && trimmed.length > 0 ? trimmed : null;
+    }
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ error: "Nothing to update." });
     }
 
     const existingLift = await prisma.lift.findFirst({
@@ -112,7 +132,7 @@ router.put("/lifts/:liftId", async (req, res, next) => {
 
     const updated = await prisma.lift.update({
       where: { id: existingLift.id },
-      data: { completed: req.body.completed }
+      data: update
     });
 
     return res.json({ lift: serializeLift(updated) });

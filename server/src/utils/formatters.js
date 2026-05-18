@@ -12,6 +12,8 @@ function serializeLift(lift) {
     sets: lift.sets,
     reps: lift.reps,
     weight: lift.weight,
+    loggedWeight: lift.loggedWeight ?? null,
+    lastLoggedWeight: lift.lastLoggedWeight ?? null,
     notes: lift.notes,
     completed: lift.completed,
     createdAt: lift.createdAt,

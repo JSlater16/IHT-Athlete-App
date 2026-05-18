@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
 import { SkeletonDatePill, SkeletonLiftCard } from "../../components/Skeleton";
@@ -18,6 +18,11 @@ export default function AthleteHomePage() {
   const [lifts, setLifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Local edit buffer for each lift's logged-weight input, keyed by
+  // lift id. Lets the athlete type freely; we PUT on blur so we
+  // don't flood the API.
+  const [logDrafts, setLogDrafts] = useState({});
+  const savedDraftsRef = useRef({});
 
   const workoutDays = useMemo(() => buildWorkoutDayGroups(lifts), [lifts]);
   const selectedWorkoutDay = useMemo(() => {
@@ -49,7 +54,13 @@ export default function AthleteHomePage() {
           token,
           signal: ctrl.signal
         });
-        setLifts(data?.lifts || []);
+        const fetched = data?.lifts || [];
+        setLifts(fetched);
+        // Seed the saved-drafts ref so persist() can detect no-op edits.
+        savedDraftsRef.current = Object.fromEntries(
+          fetched.map((l) => [l.id, l.loggedWeight ?? ""])
+        );
+        setLogDrafts({});
       } catch (loadError) {
         if (loadError.name === "AbortError") {
           return;
@@ -76,6 +87,39 @@ export default function AthleteHomePage() {
       setSelectedDayKey(workoutDays[0].key);
     }
   }, [selectedDayKey, workoutDays]);
+
+  async function persistLoggedWeight(liftId, raw) {
+    const trimmed = (raw ?? "").trim();
+    const lastSaved = savedDraftsRef.current[liftId] ?? "";
+    if (trimmed === lastSaved) return;
+    try {
+      const data = await apiRequest(`/api/me/lifts/${liftId}`, {
+        method: "PUT",
+        token,
+        body: { loggedWeight: trimmed.length > 0 ? trimmed : null }
+      });
+      const saved = data?.lift?.loggedWeight ?? null;
+      savedDraftsRef.current[liftId] = saved ?? "";
+      setLifts((current) =>
+        current.map((l) => (l.id === liftId ? { ...l, loggedWeight: saved } : l))
+      );
+    } catch (saveError) {
+      setError(saveError.message);
+    }
+  }
+
+  function liftLogValue(lift) {
+    if (lift.id in logDrafts) return logDrafts[lift.id];
+    return lift.loggedWeight ?? "";
+  }
+
+  function formatLastLogged(entry) {
+    if (!entry) return null;
+    const date = new Date(entry.date);
+    if (Number.isNaN(date.getTime())) return entry.value;
+    const month = date.toLocaleString(undefined, { month: "short" });
+    return `Last: ${entry.value} · ${month} ${date.getDate()}`;
+  }
 
   useEffect(() => {
     if (selectedBlocks.length === 0) {
@@ -185,23 +229,47 @@ export default function AthleteHomePage() {
                 </div>
 
                 <div className="lift-card-list">
-                  {selectedBlock.lifts.map((lift) => (
-                    <article
-                      key={lift.id}
-                      className={`lift-card ${lift.completed ? "is-complete" : ""}`}
-                    >
-                      <div className="lift-card-top">
-                        <div>
-                          <h3>{lift.exerciseName}</h3>
-                          <p className="lift-meta">
-                            {lift.sets} x {lift.reps} • {lift.weight}
-                          </p>
+                  {selectedBlock.lifts.map((lift) => {
+                    const lastLogged = formatLastLogged(lift.lastLoggedWeight);
+                    return (
+                      <article
+                        key={lift.id}
+                        className={`lift-card ${lift.completed ? "is-complete" : ""}`}
+                      >
+                        <div className="lift-card-top">
+                          <div>
+                            <h3>{lift.exerciseName}</h3>
+                            <p className="lift-meta">
+                              {lift.sets} x {lift.reps} • {lift.weight}
+                            </p>
+                            {lastLogged ? (
+                              <p className="lift-last-logged">{lastLogged}</p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
 
-                      <p className="lift-notes">{lift.notes || "No notes from your coach for this lift."}</p>
-                    </article>
-                  ))}
+                        <label className="lift-log-row">
+                          <span className="lift-log-label">You did</span>
+                          <input
+                            type="text"
+                            className="lift-log-input"
+                            placeholder="e.g. 225 lb"
+                            value={liftLogValue(lift)}
+                            onChange={(event) =>
+                              setLogDrafts((current) => ({
+                                ...current,
+                                [lift.id]: event.target.value
+                              }))
+                            }
+                            onBlur={(event) => persistLoggedWeight(lift.id, event.target.value)}
+                            maxLength={64}
+                          />
+                        </label>
+
+                        <p className="lift-notes">{lift.notes || "No notes from your coach for this lift."}</p>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
             ) : null}

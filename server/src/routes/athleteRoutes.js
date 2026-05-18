@@ -5,6 +5,7 @@ const { prisma } = require("../utils/prisma");
 const { parseDateInput, getWeekRange } = require("../utils/date");
 const { readProgramLibrary, summarizeProgramLibrary } = require("../utils/programLibrary");
 const { enrichLiftBlocks } = require("../utils/liftBlocks");
+const { attachLastLoggedWeight } = require("../utils/liftHistory");
 const { normalizeRehabProfile } = require("../utils/rehabProfile");
 const {
   standardProgramVariant,
@@ -503,8 +504,9 @@ router.get("/:id/lifts", async (req, res, next) => {
       weekStart,
       library
     });
+    const withHistory = await attachLastLoggedWeight(enrichedLifts);
 
-    return res.json({ lifts: enrichedLifts.map(serializeLift) });
+    return res.json({ lifts: withHistory.map(serializeLift) });
   } catch (error) {
     return next(error);
   }

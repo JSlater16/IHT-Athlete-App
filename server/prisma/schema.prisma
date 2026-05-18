@@ -59,6 +59,11 @@ model Lift {
   weight       String
   notes        String         @default("")
   completed    Boolean        @default(false)
+  // What the athlete actually used (free-text, e.g. "225 lb" or
+  // "55 lb DBs"). Distinct from `weight`, which is the coach's
+  // prescription. Drives the "Last: X" caption shown when the same
+  // exercise appears again later.
+  loggedWeight String?
   // Display order within a single day. Populated by apply-program
   // (sequential by program template). Manually-added lifts get the
   // next available value at insert time. Without this, lifts inserted

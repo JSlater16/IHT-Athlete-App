@@ -234,6 +234,41 @@
   font-size: 0.84rem;
 }
 
+.lift-last-logged {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.lift-log-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0;
+}
+
+.lift-log-label {
+  font-size: 0.78rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lift-log-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  color: inherit;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.lift-log-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
 .lift-notes,
 .notes-block {
   margin: 0.55rem 0 0;
