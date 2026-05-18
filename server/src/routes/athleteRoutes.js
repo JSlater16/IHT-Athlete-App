@@ -820,23 +820,24 @@ router.post("/:id/apply-program", async (req, res, next) => {
     const { weekStart, weekEnd } = getWeekRange(req.body?.week);
     const library = await readProgramLibrary();
     const summary = summarizeProgramLibrary(library);
-    // Eccentrics matches by variant (Alactic/Lactic); everything else
-    // matches by program name so multiple programs at the same
-    // (phase, frequency) slot are distinguishable. Falls back to a
-    // variant match for legacy data where programVariant still holds
-    // the literal "Standard".
+    // Eccentrics matches by (variant, frequency); the Alactic/Lactic
+    // split times frequency gives a unique program per slot. Every
+    // other phase matches by program name only — the name already
+    // identifies the program including its day count, so the
+    // athlete's programmingDays is informational, not a gate. Legacy
+    // fallback covers athletes whose programVariant still holds
+    // "Standard" from before the name-keyed picker.
     const matchedProgram = library.programs.find((program) => {
       if (program.phase !== athlete.phase) return false;
-      if (Number(program.frequency) !== Number(athlete.programmingDays)) return false;
       if (athlete.phase === "Eccentrics") {
+        if (Number(program.frequency) !== Number(athlete.programmingDays)) return false;
         return (program.variant || standardProgramVariant) === athlete.programVariant;
       }
       if (program.name === athlete.programVariant) return true;
-      // Legacy fallback: athlete still has programVariant="Standard"
-      // because this phase only ever had one Standard program before.
       return (
         athlete.programVariant === standardProgramVariant &&
-        (program.variant || standardProgramVariant) === standardProgramVariant
+        (program.variant || standardProgramVariant) === standardProgramVariant &&
+        Number(program.frequency) === Number(athlete.programmingDays)
       );
     });
 

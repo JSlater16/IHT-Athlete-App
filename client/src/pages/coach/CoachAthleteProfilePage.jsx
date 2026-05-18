@@ -333,17 +333,15 @@ export default function CoachAthleteProfilePage() {
     return (
       library.programs.find((program) => {
         if (program.phase !== overviewForm.phase) return false;
-        if (Number(program.frequency) !== Number(overviewForm.programmingDays)) return false;
         if (overviewForm.phase === "Eccentrics") {
+          if (Number(program.frequency) !== Number(overviewForm.programmingDays)) return false;
           return (program.variant || standardProgramVariant) === overviewForm.programVariant;
         }
         if (program.name === overviewForm.programVariant) return true;
-        // Legacy data fallback: stored "Standard" still resolves to
-        // the single legacy program in phases that historically only
-        // had one Standard template.
         return (
           overviewForm.programVariant === standardProgramVariant &&
-          (program.variant || standardProgramVariant) === standardProgramVariant
+          (program.variant || standardProgramVariant) === standardProgramVariant &&
+          Number(program.frequency) === Number(overviewForm.programmingDays)
         );
       }) || null
     );
@@ -1459,7 +1457,7 @@ export default function CoachAthleteProfilePage() {
                     ) : null}
                     <span className="metric-chip">Program Type: {overviewForm.programVariant}</span>
                     <span className="metric-chip">
-                      Frequency: {overviewForm.programmingDays}x / week
+                      Frequency: {matchedProgram?.frequency ?? overviewForm.programmingDays}x / week
                     </span>
                   </div>
 
@@ -1468,13 +1466,11 @@ export default function CoachAthleteProfilePage() {
                       <strong>{matchedProgram.name}</strong>
                       <p className="muted-copy">
                         {matchedProgram.days.length} programmed days will be applied to this week.
-                        Template matching uses phase, program type, and weekly attendance. The model
-                        only controls how long the athlete stays in each phase.
                       </p>
                     </div>
                   ) : (
                     <p className="empty-state">
-                      No template matches the current phase, program type, and weekly attendance yet.
+                      No template matches this phase and program type yet.
                     </p>
                   )}
 

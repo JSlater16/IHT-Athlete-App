@@ -21,13 +21,14 @@ function enrichLiftBlocks({ lifts, athlete, weekStart, library }) {
     return lifts;
   }
 
-  // Eccentrics matches by variant; everything else matches by program
-  // name. Legacy "Standard" stored on an athlete still resolves to
-  // any Standard-variant program at that (phase, frequency).
+  // Mirrors the apply-program match: name-based for everything except
+  // Eccentrics, with a legacy fallback for stored "Standard". For
+  // non-Eccentrics the program name is the source of truth, so
+  // programmingDays is informational and not part of the match.
   const matchedProgram = library.programs.find((program) => {
     if (program.phase !== athlete.phase) return false;
-    if (Number(program.frequency) !== Number(athlete.programmingDays)) return false;
     if (athlete.phase === "Eccentrics") {
+      if (Number(program.frequency) !== Number(athlete.programmingDays)) return false;
       return (
         (program.variant || standardProgramVariant) ===
         (athlete.programVariant || standardProgramVariant)
@@ -36,7 +37,8 @@ function enrichLiftBlocks({ lifts, athlete, weekStart, library }) {
     if (program.name === athlete.programVariant) return true;
     return (
       (athlete.programVariant || standardProgramVariant) === standardProgramVariant &&
-      (program.variant || standardProgramVariant) === standardProgramVariant
+      (program.variant || standardProgramVariant) === standardProgramVariant &&
+      Number(program.frequency) === Number(athlete.programmingDays)
     );
   });
 
