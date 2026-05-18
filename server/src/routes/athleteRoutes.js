@@ -494,7 +494,7 @@ router.get("/:id/lifts", async (req, res, next) => {
           lte: weekEnd
         }
       },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }]
+      orderBy: [{ date: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }]
     });
     const library = await readProgramLibrary();
     const enrichedLifts = enrichLiftBlocks({
@@ -522,10 +522,17 @@ router.post("/:id/lifts", async (req, res, next) => {
       return res.status(400).json({ error: validated.error });
     }
 
+    // Append manually-added lifts to the end of the day's existing
+    // block order so they don't all collide at orderIndex 0.
+    const dayMax = await prisma.lift.aggregate({
+      where: { athleteId: athlete.id, date: validated.value.date },
+      _max: { orderIndex: true }
+    });
     const lift = await prisma.lift.create({
       data: {
         athleteId: athlete.id,
-        ...validated.value
+        ...validated.value,
+        orderIndex: (dayMax._max.orderIndex ?? -1) + 1
       }
     });
 
@@ -853,7 +860,7 @@ router.post("/:id/apply-program", async (req, res, next) => {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + Number(day.dayOffset));
 
-      return day.lifts.map((configuredLift) => {
+      return day.lifts.map((configuredLift, idx) => {
         const libraryLift = library.liftLibrary.find((lift) => lift.id === configuredLift.liftId);
 
         return {
@@ -865,7 +872,8 @@ router.post("/:id/apply-program", async (req, res, next) => {
           reps: Number(configuredLift.reps || libraryLift?.defaultReps || 8),
           weight: configuredLift.weight || libraryLift?.defaultWeight || "Coach Prescribed",
           notes: configuredLift.notes || libraryLift?.defaultNotes || "",
-          completed: false
+          completed: false,
+          orderIndex: idx
         };
       });
     });
@@ -893,7 +901,7 @@ router.post("/:id/apply-program", async (req, res, next) => {
           lte: weekEnd
         }
       },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }]
+      orderBy: [{ date: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }]
     });
 
     await recordAudit({

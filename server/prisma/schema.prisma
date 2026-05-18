@@ -59,6 +59,12 @@ model Lift {
   weight       String
   notes        String         @default("")
   completed    Boolean        @default(false)
+  // Display order within a single day. Populated by apply-program
+  // (sequential by program template). Manually-added lifts get the
+  // next available value at insert time. Without this, lifts inserted
+  // in a single createMany share createdAt and render in undefined
+  // order.
+  orderIndex   Int            @default(0)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   athlete      AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Cascade)

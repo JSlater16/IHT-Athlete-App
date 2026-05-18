@@ -144,8 +144,18 @@ export function groupLiftsByBlock(lifts) {
     groups.set(firstBlockLabel, [...pendingLifts, ...groups.get(firstBlockLabel)]);
   }
 
-  return Array.from(groups.entries()).map(([label, groupedLifts]) => ({
-    label,
-    lifts: groupedLifts
-  }));
+  // Sort blocks numerically so "Block 1, Block 2, Block 10" beats
+  // the lexical "Block 1, Block 10, Block 2". Non-Block labels (e.g.
+  // "Prep", "Workout") sort to the front to preserve historical
+  // ordering for hand-typed lifts.
+  const blockNumber = (label) => {
+    const match = /^Block\s+(\d+)$/i.exec(label);
+    return match ? Number(match[1]) : -1;
+  };
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => blockNumber(a) - blockNumber(b))
+    .map(([label, groupedLifts]) => ({
+      label,
+      lifts: groupedLifts
+    }));
 }

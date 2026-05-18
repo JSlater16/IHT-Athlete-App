@@ -72,7 +72,7 @@ router.get("/lifts", async (req, res, next) => {
           lte: weekEnd
         }
       },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }]
+      orderBy: [{ date: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }]
     });
     const library = await readProgramLibrary();
     const enrichedLifts = enrichLiftBlocks({
