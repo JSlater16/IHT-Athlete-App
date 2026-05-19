@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { weightDelta } from "../utils/weight";
 
 const workoutPlacementOptions = ["Prep", "Block 1", "Block 2", "Block 3", "Block 4"];
 
@@ -178,18 +179,33 @@ export default function LiftTable({
                   />
                 </td>
                 {showLoggedColumn ? (
-                  <td className="lift-table-logged">
-                    {lift.loggedWeight ? (
-                      <strong>{lift.loggedWeight}</strong>
-                    ) : (
-                      <span className="muted-copy compact-copy">—</span>
-                    )}
-                    {lift.lastLoggedWeight ? (
-                      <div className="muted-copy compact-copy lift-table-last-logged">
-                        Prior: {lift.lastLoggedWeight.value}
-                      </div>
-                    ) : null}
-                  </td>
+                  (() => {
+                    const delta = weightDelta(
+                      lift.loggedWeight,
+                      lift.lastLoggedWeight?.value
+                    );
+                    return (
+                      <td className="lift-table-logged">
+                        {lift.loggedWeight ? (
+                          <span className="lift-table-logged-row">
+                            <strong>{lift.loggedWeight}</strong>
+                            {delta ? (
+                              <span className={`weight-delta is-${delta.sign}`}>
+                                {delta.label}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          <span className="muted-copy compact-copy">—</span>
+                        )}
+                        {lift.lastLoggedWeight ? (
+                          <div className="muted-copy compact-copy lift-table-last-logged">
+                            Prior: {lift.lastLoggedWeight.value}
+                          </div>
+                        ) : null}
+                      </td>
+                    );
+                  })()
                 ) : null}
                 <td className="lift-table-notes">
                   <input

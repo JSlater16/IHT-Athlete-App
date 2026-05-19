@@ -651,3 +651,38 @@
     align-items: stretch;
   }
 }
+
+/* Logged-weight delta chip. Green = increase, red = decrease, gray
+ * = no change. Used on the athlete log-row and the coach Logged
+ * column. */
+.weight-delta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.weight-delta.is-up {
+  background: var(--success-bg);
+  color: var(--success-ink);
+}
+
+.weight-delta.is-down {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.weight-delta.is-same {
+  background: var(--surface-muted);
+  color: var(--text-soft);
+}
+
+.lift-table-logged-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}

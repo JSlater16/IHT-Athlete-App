@@ -8,6 +8,7 @@ import {
   startOfWeek,
   toDateInputValue
 } from "../../utils/date";
+import { weightDelta } from "../../utils/weight";
 
 export default function AthleteHomePage() {
   const { token } = useAuth();
@@ -226,6 +227,10 @@ export default function AthleteHomePage() {
                 <div className="lift-card-list">
                   {selectedBlock.lifts.map((lift) => {
                     const lastLogged = formatLastLogged(lift.lastLoggedWeight);
+                    const delta = weightDelta(
+                      lift.loggedWeight,
+                      lift.lastLoggedWeight?.value
+                    );
                     return (
                       <article
                         key={lift.id}
@@ -259,6 +264,11 @@ export default function AthleteHomePage() {
                             onBlur={(event) => persistLoggedWeight(lift.id, event.target.value)}
                             maxLength={64}
                           />
+                          {delta ? (
+                            <span className={`weight-delta is-${delta.sign}`}>
+                              {delta.label}
+                            </span>
+                          ) : null}
                         </label>
 
                         <p className="lift-notes">{lift.notes || "No notes from your coach for this lift."}</p>
