@@ -1,0 +1,209 @@
+/* Coach UI refresh — Carbon-style dense.
+ *
+ * Scoped under `.coach-shell` so the athlete experience stays warm
+ * and the login/forcedecks screens are untouched. Everything in here
+ * is an override on top of coach.css and works by reassigning a few
+ * design tokens at the shell root, plus a handful of targeted
+ * selectors where the page hardcoded a value instead of reading from
+ * a token. Goal: monochrome neutrals + thin lines + minimal shadows +
+ * tight radii. Cyan reserved for primary actions.
+ */
+
+.coach-shell {
+  /* Surfaces — flat whites on a near-white page, no translucency. */
+  --bg: #f8f9fb;
+  --bg-soft: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-muted: #f3f4f7;
+  --surface-translucent: #f3f4f7;
+
+  /* Lines — hairline borders carry the structure instead of shadows. */
+  --line: rgba(15, 23, 42, 0.07);
+  --line-strong: rgba(15, 23, 42, 0.12);
+  --line-on-surface: rgba(15, 23, 42, 0.07);
+
+  /* Text — slightly stronger contrast for dense reads. */
+  --text-strong: #0f172a;
+  --text-soft: #4b5563;
+  --text-on-hero: #1f2937;
+  --field-label: #1f2937;
+
+  /* Accent — kept for primary actions and active nav only. The
+   * "-soft" washes used for chips and selected rows go neutral. */
+  --accent-soft: rgba(15, 23, 42, 0.05);
+  --accent-soft-strong: rgba(15, 23, 42, 0.09);
+  --accent-ring-soft: rgba(15, 23, 42, 0.05);
+
+  /* Shadows — almost gone. Hairline 1px borders do the lifting. */
+  --shadow-soft: 0 0 0 1px var(--line);
+  --shadow-strong: 0 0 0 1px var(--line-strong);
+  --shadow-toast:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 12px 28px rgba(15, 23, 42, 0.1);
+  --shadow-modal:
+    0 1px 2px rgba(15, 23, 42, 0.1),
+    0 16px 40px rgba(15, 23, 42, 0.16);
+
+  /* Flat page; the radial gradients carry too much weight behind
+   * dense tables and roster lists. */
+  --page-background: #f8f9fb;
+  --hero-card-background: #ffffff;
+  --athlete-frame-background: #ffffff;
+  --tabbar-background: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .coach-shell {
+    --bg: #0b0d12;
+    --bg-soft: #11141b;
+    --surface: #14171f;
+    --surface-raised: #14171f;
+    --surface-strong: #161a23;
+    --surface-muted: #11141b;
+    --surface-translucent: #11141b;
+
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --line-on-surface: rgba(255, 255, 255, 0.08);
+
+    --text-strong: #e5e7eb;
+    --text-soft: #9ca3af;
+    --text-on-hero: #d1d5db;
+    --field-label: #d1d5db;
+
+    --accent-soft: rgba(255, 255, 255, 0.06);
+    --accent-soft-strong: rgba(255, 255, 255, 0.1);
+    --accent-ring-soft: rgba(255, 255, 255, 0.06);
+
+    --shadow-soft: 0 0 0 1px var(--line);
+    --shadow-strong: 0 0 0 1px var(--line-strong);
+
+    --page-background: #0b0d12;
+    --hero-card-background: #14171f;
+    --athlete-frame-background: #14171f;
+    --tabbar-background: #14171f;
+  }
+}
+
+/* Tighten card geometry across the coach surface. coach.css uses a
+ * mix of 14-22px radii by hand — clamp the visible cards to 8px so
+ * the dense-table aesthetic reads consistently. */
+.coach-shell .dashboard-card,
+.coach-shell .ios-card,
+.coach-shell .athlete-frame,
+.coach-shell .template-match-card,
+.coach-shell .lift-editor-card,
+.coach-shell .roster-row,
+.coach-shell .program-card,
+.coach-shell .empty-state,
+.coach-shell .ios-card.hero-card {
+  border-radius: 8px;
+}
+
+/* Hairline borders, no shadow. */
+.coach-shell .dashboard-card,
+.coach-shell .ios-card,
+.coach-shell .athlete-frame,
+.coach-shell .template-match-card,
+.coach-shell .lift-editor-card,
+.coach-shell .program-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Inputs / buttons / chips — drop to 6px so they match the tighter
+ * card geometry. Pills (status badges, date pills) stay rounded.   */
+.coach-shell input,
+.coach-shell select,
+.coach-shell textarea,
+.coach-shell .primary-button,
+.coach-shell .ghost-button,
+.coach-shell .destructive-button {
+  border-radius: 6px;
+}
+
+.coach-shell .status-badge,
+.coach-shell .metric-chip {
+  border-radius: 4px;
+}
+
+/* Sidebar — flat, single border, no translucent. Active link still
+ * gets a subtle accent wash but everything else is neutral. */
+.coach-shell .coach-sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  backdrop-filter: none;
+}
+
+.coach-shell .sidebar-link {
+  border-radius: 6px;
+}
+
+.coach-shell .sidebar-link.is-active {
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Tables — denser rows, hairline dividers, no row striping. */
+.coach-shell .lift-table {
+  border-collapse: collapse;
+}
+
+.coach-shell .lift-table th,
+.coach-shell .lift-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.55rem 0.65rem;
+}
+
+.coach-shell .lift-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  font-weight: 600;
+  background: var(--surface-muted);
+}
+
+.coach-shell .lift-table-input {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+}
+
+.coach-shell .lift-table-input:hover,
+.coach-shell .lift-table-input:focus {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+/* Buttons — primary keeps the cyan, but ghost goes neutral so it
+ * doesn't compete. Drop the glossy gradient + heavy shadow on
+ * primary; a flat fill with a subtle press state is enough. */
+.coach-shell .primary-button {
+  background: var(--accent-ink);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.coach-shell .primary-button:hover {
+  background: #0b3a40;
+}
+
+.coach-shell .ghost-button {
+  background: var(--surface);
+  color: var(--text-strong);
+  border: 1px solid var(--line-strong);
+  box-shadow: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .coach-shell .ghost-button:hover {
+    background: var(--surface-muted);
+  }
+}
