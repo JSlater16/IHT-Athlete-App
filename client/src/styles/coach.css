@@ -573,6 +573,16 @@
   white-space: nowrap;
 }
 
+.lift-table-logged {
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.lift-table-last-logged {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+}
+
 /* Modal action row with destructive on left, primary on right */
 .program-modal-actions {
   display: flex;

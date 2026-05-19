@@ -33,6 +33,7 @@ export default function LiftTable({
   onRemoveLift,
   onMoveLift,
   showDayColumn,
+  showLoggedColumn,
   focusNextRowRef
 }) {
   const handleBlur = (dayIndex, liftIndex, field, value) => {
@@ -75,6 +76,7 @@ export default function LiftTable({
             <th>Sets</th>
             <th>Reps</th>
             <th>Weight</th>
+            {showLoggedColumn ? <th>Logged</th> : null}
             <th>Notes</th>
             {showActions ? <th aria-label="Actions" /> : null}
           </tr>
@@ -175,6 +177,20 @@ export default function LiftTable({
                     required
                   />
                 </td>
+                {showLoggedColumn ? (
+                  <td className="lift-table-logged">
+                    {lift.loggedWeight ? (
+                      <strong>{lift.loggedWeight}</strong>
+                    ) : (
+                      <span className="muted-copy compact-copy">—</span>
+                    )}
+                    {lift.lastLoggedWeight ? (
+                      <div className="muted-copy compact-copy lift-table-last-logged">
+                        Prior: {lift.lastLoggedWeight.value}
+                      </div>
+                    ) : null}
+                  </td>
+                ) : null}
                 <td className="lift-table-notes">
                   <input
                     type="text"

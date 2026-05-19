@@ -1315,12 +1315,15 @@ export default function CoachAthleteProfilePage() {
                       sets: String(lift.sets ?? ""),
                       reps: String(lift.reps ?? ""),
                       weight: lift.weight || "",
-                      notes: lift.notes || ""
+                      notes: lift.notes || "",
+                      loggedWeight: lift.loggedWeight || null,
+                      lastLoggedWeight: lift.lastLoggedWeight || null
                     },
                     liftsInDay: selectedDayLifts.length
                   }))}
                   library={library}
                   liftByNormalizedName={null}
+                  showLoggedColumn
                   onUpdateLiftField={(_dayIdx, liftIdx, field, value) => {
                     const target = selectedDayLifts[liftIdx];
                     if (target) updateLiftField(target.id, field, value);
