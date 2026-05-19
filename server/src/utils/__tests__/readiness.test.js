@@ -99,26 +99,56 @@ test("missing metric on today's test returns error, no partial score", () => {
   assert.equal(result.score, null);
 });
 
-test("zero baseline returns error (physiologically invalid)", () => {
+test("zero baseline across ALL priors falls back to establishing_baseline", () => {
+  // Now that we filter non-positive priors as missing-data, an
+  // all-zero series for one metric leaves it with < 2 positive values
+  // → can't establish a baseline for that metric → status flips to
+  // establishing_baseline (not error).
   const today = makeTest(0);
   const priors = buildPriors(5).map((t) => ({
     ...t,
     metrics: { ...t.metrics, force_at_zero_velocity: 0 }
   }));
   const result = calculateReadiness(today, priors);
+  assert.equal(result.status, "establishing_baseline");
+});
+
+test("a few zero priors are ignored; remaining positives form the baseline", () => {
+  // Mirror of the Banks Wickersham case: most priors have a real
+  // CRFD, two have 0 because VALD couldn't compute it. The 0s should
+  // be filtered, not poison the median.
+  const today = makeTest(0);
+  const priors = buildPriors(5).map((t, idx) => ({
+    ...t,
+    metrics: {
+      ...t.metrics,
+      concentric_rfd: idx < 2 ? 0 : t.metrics.concentric_rfd
+    }
+  }));
+  const result = calculateReadiness(today, priors);
+  assert.equal(result.status, "green_peaked");
+  assert.equal(result.baselines.concentric_rfd, BASE.concentric_rfd);
+});
+
+test("today's metric at 0 still rejected (missing data on the latest test)", () => {
+  const today = makeTest(0);
+  today.metrics.concentric_rfd = 0;
+  const result = calculateReadiness(today, buildPriors(5));
   assert.equal(result.status, "error");
   assert.match(result.error, /non-positive/);
 });
 
-test("negative baseline returns error", () => {
+test("all-negative priors for one metric fall back to establishing_baseline", () => {
+  // Negative values are treated the same as zeros (VALD "could not
+  // compute") — they're filtered out of the per-metric baseline.
+  // With every prior masked, we can't establish a baseline.
   const today = makeTest(0);
   const priors = buildPriors(5).map((t) => ({
     ...t,
     metrics: { ...t.metrics, eccentric_peak_velocity: -0.5 }
   }));
   const result = calculateReadiness(today, priors);
-  assert.equal(result.status, "error");
-  assert.match(result.error, /non-positive/);
+  assert.equal(result.status, "establishing_baseline");
 });
 
 test("all metrics exactly at baseline → score is exactly 100", () => {

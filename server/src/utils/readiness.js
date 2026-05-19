@@ -66,6 +66,17 @@ function gatherInputs(todayTest, priorTests, { windowDays = BASELINE_WINDOW_DAYS
     if (v == null) {
       return { ok: false, error: `Missing metric on today's test: ${key}` };
     }
+    // VALD occasionally returns 0 for a metric when the analytics
+    // pipeline couldn't compute it (e.g., concentric phase too short
+    // to resolve a clean RFD). That's missing-data masquerading as a
+    // real value — reject it on today's row rather than silently
+    // ratio against 0.
+    if (!(v > 0)) {
+      return {
+        ok: false,
+        error: `Today's ${key} is non-positive (${v}); likely missing from this test`
+      };
+    }
     todayValues[key] = v;
   }
 
@@ -92,7 +103,9 @@ function gatherInputs(todayTest, priorTests, { windowDays = BASELINE_WINDOW_DAYS
     const series = [];
     for (const t of eligible) {
       const v = getMetricValue(t, key);
-      if (v != null) series.push(v);
+      // Skip non-positive prior values — VALD treats them as "could
+      // not compute" so they shouldn't poison the median.
+      if (v != null && v > 0) series.push(v);
     }
     baselineValues[key] = series;
   }
