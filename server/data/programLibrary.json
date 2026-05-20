@@ -5048,6 +5048,33 @@
       "defaultReps": 5,
       "defaultWeight": "barbell moderate-heavy",
       "defaultNotes": "Each rep starts from the floor. Explosive concentric."
+    },
+    {
+      "id": "skater-bound-to-stick",
+      "name": "Skater bound to stick",
+      "category": "Land, dynamic, rotational",
+      "defaultSets": 3,
+      "defaultReps": 5,
+      "defaultWeight": "BW",
+      "defaultNotes": "Per side. Lateral hop, stick the landing."
+    },
+    {
+      "id": "rotational-jump-to-stick",
+      "name": "Rotational jump to stick",
+      "category": "Land, rotational",
+      "defaultSets": 3,
+      "defaultReps": 3,
+      "defaultWeight": "BW",
+      "defaultNotes": "Per side. 180° rotation in air. Stick the landing. Max intent."
+    },
+    {
+      "id": "med-ball-rotational-slam",
+      "name": "Med ball rotational slam",
+      "category": "Ballistic, rotate",
+      "defaultSets": 3,
+      "defaultReps": 5,
+      "defaultWeight": "med ball",
+      "defaultNotes": "Per side. Rotate trunk and slam down to side."
     }
   ],
   "programs": [
@@ -20711,6 +20738,1221 @@
               "reps": 7,
               "weight": "DB heavy",
               "notes": "Reps 6-8. Heavy."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explosive-3-day",
+      "name": "Explosive - 3-Day",
+      "phase": "Power",
+      "variant": "Standard",
+      "frequency": 3,
+      "days": [
+        {
+          "dayOffset": 0,
+          "dayLabel": "Lower Explosive (Squat + Hinge)",
+          "lifts": [
+            {
+              "liftId": "depth-jump-to-max-vertical",
+              "exerciseName": "Depth jump to max vertical",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW (12-18 in box)",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "broad-jump-to-stick",
+              "exerciseName": "Broad jump to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "bounding-for-distance",
+              "exerciseName": "Bounding for distance",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "30 yds per set."
+            },
+            {
+              "liftId": "skater-bound-to-stick",
+              "exerciseName": "Skater bound to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Lateral hop, stick the landing."
+            },
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Back squat (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 3,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max."
+            },
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Speed back squat",
+              "blockLabel": "Block 2",
+              "sets": 6,
+              "reps": 2,
+              "weight": "55-60% 1RM",
+              "notes": "Max bar speed."
+            },
+            {
+              "liftId": "deadlift-conventional-or-trap-bar",
+              "exerciseName": "Deadlift (lighter top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 3,
+              "weight": "75% 1RM",
+              "notes": "Lighter than dedicated deadlift day."
+            },
+            {
+              "liftId": "bulgarian-split-squat",
+              "exerciseName": "Bulgarian split squat",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "DB heavy",
+              "notes": "Per side. Explosive."
+            },
+            {
+              "liftId": "single-leg-rdl",
+              "exerciseName": "Single-leg RDL",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "DB moderate-heavy",
+              "notes": "Per side."
+            },
+            {
+              "liftId": "standing-calf-raise",
+              "exerciseName": "Standing calf raise",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "heavy-farmer-carry",
+              "exerciseName": "Heavy farmer carry",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 1,
+              "weight": "heavy DB or trap bar",
+              "notes": "30 yds per set."
+            }
+          ]
+        },
+        {
+          "dayOffset": 2,
+          "dayLabel": "Upper Explosive (Push + Pull)",
+          "lifts": [
+            {
+              "liftId": "med-ball-chest-pass",
+              "exerciseName": "Med ball chest pass",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-scoop-toss",
+              "exerciseName": "Med ball rotational scoop toss",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Bench press (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 3,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max."
+            },
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Speed bench press",
+              "blockLabel": "Block 2",
+              "sets": 6,
+              "reps": 3,
+              "weight": "55-60% 1RM",
+              "notes": "Max bar speed."
+            },
+            {
+              "liftId": "push-press",
+              "exerciseName": "Push press",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 4,
+              "weight": "barbell heavy",
+              "notes": "Reps 3-5. Explosive."
+            },
+            {
+              "liftId": "weighted-pull-up",
+              "exerciseName": "Weighted pull-up",
+              "blockLabel": "Block 3",
+              "sets": 4,
+              "reps": 3,
+              "weight": "weight belt",
+              "notes": "Heavy but explosive."
+            },
+            {
+              "liftId": "barbell-row",
+              "exerciseName": "Speed barbell row",
+              "blockLabel": "Block 3",
+              "sets": 5,
+              "reps": 3,
+              "weight": "55-65% 1RM",
+              "notes": "Max bar speed."
+            },
+            {
+              "liftId": "pendlay-row",
+              "exerciseName": "Pendlay row",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "barbell moderate-heavy",
+              "notes": "Explosive concentric."
+            },
+            {
+              "liftId": "barbell-or-db-curl",
+              "exerciseName": "Barbell or DB curl",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "moderate-heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "tricep-extension",
+              "exerciseName": "Tricep extension",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "cable or DB heavy",
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "dayOffset": 4,
+          "dayLabel": "Power Day (Plyo + Sprint + Med Ball)",
+          "lifts": [
+            {
+              "liftId": "box-jump-high-to-stick",
+              "exerciseName": "Box jump (high) to stick",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "tuck-jump",
+              "exerciseName": "Tuck jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Continuous reps."
+            },
+            {
+              "liftId": "rotational-jump-to-stick",
+              "exerciseName": "Rotational jump to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Per side. 180° rotation in air. Stick the landing. Max intent."
+            },
+            {
+              "liftId": "broad-jump-to-stick",
+              "exerciseName": "Broad jump to stick",
+              "blockLabel": "Block 2",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "bounding-for-distance",
+              "exerciseName": "Bounding for distance",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "30 yds per set."
+            },
+            {
+              "liftId": "lateral-bound-to-stick",
+              "exerciseName": "Lateral bound to stick",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "skater-bound-to-stick",
+              "exerciseName": "Skater bound to stick",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Lateral hop, stick the landing. Max intent."
+            },
+            {
+              "liftId": "sprint",
+              "exerciseName": "Sprint",
+              "blockLabel": "Block 3",
+              "sets": 6,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "15-20m per rep. Max intent, full recovery."
+            },
+            {
+              "liftId": "med-ball-rotational-scoop-toss",
+              "exerciseName": "Med ball rotational scoop toss",
+              "blockLabel": "Block 4",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 4",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-shot-put",
+              "exerciseName": "Med ball rotational shot put",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 3,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-slam",
+              "exerciseName": "Med ball rotational slam",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Rotate trunk and slam down to side."
+            },
+            {
+              "liftId": "loaded-squat-jump",
+              "exerciseName": "Loaded squat jump",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 3,
+              "weight": "DB or vest ~10% BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "heavy-farmer-carry",
+              "exerciseName": "Heavy farmer carry",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 1,
+              "weight": "heavy DB or trap bar",
+              "notes": "30 yds per set."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explosive-4-day",
+      "name": "Explosive - 4-Day",
+      "phase": "Power",
+      "variant": "Standard",
+      "frequency": 4,
+      "days": [
+        {
+          "dayOffset": 0,
+          "dayLabel": "Lower Explosive: Squat + Vertical",
+          "lifts": [
+            {
+              "liftId": "depth-jump-to-max-vertical",
+              "exerciseName": "Depth jump to max vertical",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW (12-18 in box)",
+              "notes": "Max intent, full recovery. Reactive — short ground contact, jump as high as possible."
+            },
+            {
+              "liftId": "box-jump-high-to-stick",
+              "exerciseName": "Box jump (high) to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent. Stick the landing."
+            },
+            {
+              "liftId": "loaded-squat-jump",
+              "exerciseName": "Loaded squat jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "DB or vest ~10% BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "skater-bound-to-stick",
+              "exerciseName": "Skater bound to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Lateral hop, stick the landing. Max intent."
+            },
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Back squat (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 3,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max. PAP before speed work."
+            },
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Speed back squat",
+              "blockLabel": "Block 2",
+              "sets": 8,
+              "reps": 2,
+              "weight": "55-60% 1RM",
+              "notes": "Dynamic effort. Max bar speed. 60-90 sec rest."
+            },
+            {
+              "liftId": "bulgarian-split-squat",
+              "exerciseName": "Bulgarian split squat",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "DB heavy",
+              "notes": "Per side. Explosive concentric."
+            },
+            {
+              "liftId": "barbell-hip-thrust",
+              "exerciseName": "Barbell hip thrust",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "barbell moderate-heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "standing-calf-raise",
+              "exerciseName": "Standing calf raise",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "heavy",
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "dayOffset": 1,
+          "dayLabel": "Upper Explosive: Push",
+          "lifts": [
+            {
+              "liftId": "med-ball-chest-pass",
+              "exerciseName": "Med ball chest pass",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-scoop-toss",
+              "exerciseName": "Med ball rotational scoop toss",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Max intent. Drive from the ground up."
+            },
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Bench press (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 3,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max. PAP before speed work."
+            },
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Speed bench press",
+              "blockLabel": "Block 2",
+              "sets": 8,
+              "reps": 3,
+              "weight": "55-60% 1RM",
+              "notes": "Dynamic effort. Max bar speed."
+            },
+            {
+              "liftId": "push-press",
+              "exerciseName": "Push press",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 4,
+              "weight": "barbell heavy",
+              "notes": "Reps 3-5. Explosive, heavy. Use leg drive."
+            },
+            {
+              "liftId": "weighted-dip",
+              "exerciseName": "Weighted dip",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "weight belt",
+              "notes": ""
+            },
+            {
+              "liftId": "strict-ohp",
+              "exerciseName": "Strict OHP",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "moderate",
+              "notes": "Strict — no leg drive."
+            },
+            {
+              "liftId": "tricep-extension",
+              "exerciseName": "Tricep extension",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "cable or DB heavy",
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "dayOffset": 3,
+          "dayLabel": "Lower Explosive: Hinge + Horizontal",
+          "lifts": [
+            {
+              "liftId": "depth-drop-to-broad-jump",
+              "exerciseName": "Depth drop to broad jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Reactive. Drop and explode out horizontally."
+            },
+            {
+              "liftId": "bounding-for-distance",
+              "exerciseName": "Bounding for distance",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "30 yds per set. Alternating legs, max distance per contact."
+            },
+            {
+              "liftId": "lateral-bound-to-stick",
+              "exerciseName": "Lateral bound to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Stick the landing."
+            },
+            {
+              "liftId": "rotational-jump-to-stick",
+              "exerciseName": "Rotational jump to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Per side. 90° rotation in air. Stick the landing. Max intent."
+            },
+            {
+              "liftId": "deadlift-conventional-or-trap-bar",
+              "exerciseName": "Deadlift (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 2,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max. PAP before speed work."
+            },
+            {
+              "liftId": "deadlift-conventional-or-trap-bar",
+              "exerciseName": "Speed deadlift",
+              "blockLabel": "Block 2",
+              "sets": 6,
+              "reps": 2,
+              "weight": "55-65% 1RM",
+              "notes": "Dynamic effort. Max bar speed."
+            },
+            {
+              "liftId": "single-leg-rdl",
+              "exerciseName": "Single-leg RDL",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "DB moderate-heavy",
+              "notes": "Per side. Explosive concentric."
+            },
+            {
+              "liftId": "rdl",
+              "exerciseName": "RDL",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "barbell moderate",
+              "notes": "Controlled."
+            },
+            {
+              "liftId": "heavy-farmer-carry",
+              "exerciseName": "Heavy farmer carry",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 1,
+              "weight": "heavy DB or trap bar",
+              "notes": "30 yds per set."
+            }
+          ]
+        },
+        {
+          "dayOffset": 4,
+          "dayLabel": "Upper Explosive: Pull",
+          "lifts": [
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent primer."
+            },
+            {
+              "liftId": "med-ball-rotational-shot-put",
+              "exerciseName": "Med ball rotational shot put",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-scoop-toss",
+              "exerciseName": "Med ball rotational scoop toss",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "weighted-pull-up",
+              "exerciseName": "Weighted pull-up",
+              "blockLabel": "Block 2",
+              "sets": 5,
+              "reps": 3,
+              "weight": "weight belt",
+              "notes": "Heavy but explosive — pull up fast."
+            },
+            {
+              "liftId": "barbell-row",
+              "exerciseName": "Speed barbell row",
+              "blockLabel": "Block 2",
+              "sets": 6,
+              "reps": 3,
+              "weight": "55-65% 1RM",
+              "notes": "Dynamic effort. Max bar speed."
+            },
+            {
+              "liftId": "pendlay-row",
+              "exerciseName": "Pendlay row",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "barbell moderate-heavy",
+              "notes": "Each rep starts from the floor. Explosive concentric."
+            },
+            {
+              "liftId": "single-arm-db-row",
+              "exerciseName": "Single-arm DB row",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "DB heavy",
+              "notes": "Per side."
+            },
+            {
+              "liftId": "db-shrug",
+              "exerciseName": "DB shrug",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "DB heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "barbell-or-db-curl",
+              "exerciseName": "Barbell or DB curl",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "moderate-heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "hammer-curl",
+              "exerciseName": "Hammer curl",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "DB moderate-heavy",
+              "notes": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explosive-5-day",
+      "name": "Explosive - 5-Day",
+      "phase": "Power",
+      "variant": "Standard",
+      "frequency": 5,
+      "days": [
+        {
+          "dayOffset": 0,
+          "dayLabel": "Lower Explosive: Squat + Vertical",
+          "lifts": [
+            {
+              "liftId": "depth-jump-to-max-vertical",
+              "exerciseName": "Depth jump to max vertical",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW (12-18 in box)",
+              "notes": "Max intent, full recovery. Reactive — short ground contact, jump as high as possible."
+            },
+            {
+              "liftId": "box-jump-high-to-stick",
+              "exerciseName": "Box jump (high) to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent. Stick the landing."
+            },
+            {
+              "liftId": "loaded-squat-jump",
+              "exerciseName": "Loaded squat jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "DB or vest ~10% BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "skater-bound-to-stick",
+              "exerciseName": "Skater bound to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Lateral hop, stick the landing. Max intent."
+            },
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Back squat (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 3,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max. PAP before speed work."
+            },
+            {
+              "liftId": "back-squat",
+              "exerciseName": "Speed back squat",
+              "blockLabel": "Block 2",
+              "sets": 8,
+              "reps": 2,
+              "weight": "55-60% 1RM",
+              "notes": "Dynamic effort. Max bar speed. 60-90 sec rest."
+            },
+            {
+              "liftId": "bulgarian-split-squat",
+              "exerciseName": "Bulgarian split squat",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "DB heavy",
+              "notes": "Per side. Explosive concentric."
+            },
+            {
+              "liftId": "barbell-hip-thrust",
+              "exerciseName": "Barbell hip thrust",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "barbell moderate-heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "standing-calf-raise",
+              "exerciseName": "Standing calf raise",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "heavy",
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "dayOffset": 1,
+          "dayLabel": "Upper Explosive: Push",
+          "lifts": [
+            {
+              "liftId": "med-ball-chest-pass",
+              "exerciseName": "Med ball chest pass",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-scoop-toss",
+              "exerciseName": "Med ball rotational scoop toss",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Max intent. Drive from the ground up."
+            },
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Bench press (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 3,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max. PAP before speed work."
+            },
+            {
+              "liftId": "bench-press",
+              "exerciseName": "Speed bench press",
+              "blockLabel": "Block 2",
+              "sets": 8,
+              "reps": 3,
+              "weight": "55-60% 1RM",
+              "notes": "Dynamic effort. Max bar speed."
+            },
+            {
+              "liftId": "push-press",
+              "exerciseName": "Push press",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 4,
+              "weight": "barbell heavy",
+              "notes": "Reps 3-5. Explosive, heavy. Use leg drive."
+            },
+            {
+              "liftId": "weighted-dip",
+              "exerciseName": "Weighted dip",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "weight belt",
+              "notes": ""
+            },
+            {
+              "liftId": "strict-ohp",
+              "exerciseName": "Strict OHP",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "moderate",
+              "notes": "Strict — no leg drive."
+            },
+            {
+              "liftId": "tricep-extension",
+              "exerciseName": "Tricep extension",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "cable or DB heavy",
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "dayOffset": 2,
+          "dayLabel": "Power Day (Plyo + Sprint + Med Ball)",
+          "lifts": [
+            {
+              "liftId": "box-jump-high-to-stick",
+              "exerciseName": "Box jump (high) to stick",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "tuck-jump",
+              "exerciseName": "Tuck jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Continuous reps."
+            },
+            {
+              "liftId": "rotational-jump-to-stick",
+              "exerciseName": "Rotational jump to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Per side. 180° rotation in air. Stick the landing. Max intent."
+            },
+            {
+              "liftId": "broad-jump-to-stick",
+              "exerciseName": "Broad jump to stick",
+              "blockLabel": "Block 2",
+              "sets": 4,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "bounding-for-distance",
+              "exerciseName": "Bounding for distance",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "30 yds per set."
+            },
+            {
+              "liftId": "lateral-bound-to-stick",
+              "exerciseName": "Lateral bound to stick",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "skater-bound-to-stick",
+              "exerciseName": "Skater bound to stick",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Lateral hop, stick the landing. Max intent."
+            },
+            {
+              "liftId": "sprint",
+              "exerciseName": "Sprint",
+              "blockLabel": "Block 3",
+              "sets": 6,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "15-20m per rep. Max intent, full recovery."
+            },
+            {
+              "liftId": "med-ball-rotational-scoop-toss",
+              "exerciseName": "Med ball rotational scoop toss",
+              "blockLabel": "Block 4",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 4",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-shot-put",
+              "exerciseName": "Med ball rotational shot put",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 3,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-slam",
+              "exerciseName": "Med ball rotational slam",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Rotate trunk and slam down to side."
+            },
+            {
+              "liftId": "loaded-squat-jump",
+              "exerciseName": "Loaded squat jump",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 3,
+              "weight": "DB or vest ~10% BW",
+              "notes": "Max intent."
+            },
+            {
+              "liftId": "heavy-farmer-carry",
+              "exerciseName": "Heavy farmer carry",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 1,
+              "weight": "heavy DB or trap bar",
+              "notes": "30 yds per set."
+            }
+          ]
+        },
+        {
+          "dayOffset": 3,
+          "dayLabel": "Lower Explosive: Hinge + Horizontal",
+          "lifts": [
+            {
+              "liftId": "depth-drop-to-broad-jump",
+              "exerciseName": "Depth drop to broad jump",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Reactive. Drop and explode out horizontally."
+            },
+            {
+              "liftId": "bounding-for-distance",
+              "exerciseName": "Bounding for distance",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 1,
+              "weight": "BW",
+              "notes": "30 yds per set. Alternating legs, max distance per contact."
+            },
+            {
+              "liftId": "lateral-bound-to-stick",
+              "exerciseName": "Lateral bound to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "BW",
+              "notes": "Per side. Stick the landing."
+            },
+            {
+              "liftId": "rotational-jump-to-stick",
+              "exerciseName": "Rotational jump to stick",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "BW",
+              "notes": "Per side. 90° rotation in air. Stick the landing. Max intent."
+            },
+            {
+              "liftId": "deadlift-conventional-or-trap-bar",
+              "exerciseName": "Deadlift (heavy top set)",
+              "blockLabel": "Block 2",
+              "sets": 3,
+              "reps": 2,
+              "weight": "80% 1RM",
+              "notes": "Heavy but not max. PAP before speed work."
+            },
+            {
+              "liftId": "deadlift-conventional-or-trap-bar",
+              "exerciseName": "Speed deadlift",
+              "blockLabel": "Block 2",
+              "sets": 6,
+              "reps": 2,
+              "weight": "55-65% 1RM",
+              "notes": "Dynamic effort. Max bar speed."
+            },
+            {
+              "liftId": "single-leg-rdl",
+              "exerciseName": "Single-leg RDL",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "DB moderate-heavy",
+              "notes": "Per side. Explosive concentric."
+            },
+            {
+              "liftId": "rdl",
+              "exerciseName": "RDL",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "barbell moderate",
+              "notes": "Controlled."
+            },
+            {
+              "liftId": "heavy-farmer-carry",
+              "exerciseName": "Heavy farmer carry",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 1,
+              "weight": "heavy DB or trap bar",
+              "notes": "30 yds per set."
+            }
+          ]
+        },
+        {
+          "dayOffset": 4,
+          "dayLabel": "Upper Explosive: Pull",
+          "lifts": [
+            {
+              "liftId": "med-ball-overhead-slam",
+              "exerciseName": "Med ball overhead slam",
+              "blockLabel": "Block 1",
+              "sets": 4,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Max intent primer."
+            },
+            {
+              "liftId": "med-ball-rotational-shot-put",
+              "exerciseName": "Med ball rotational shot put",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 3,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "med-ball-rotational-scoop-toss",
+              "exerciseName": "Med ball rotational scoop toss",
+              "blockLabel": "Block 1",
+              "sets": 3,
+              "reps": 5,
+              "weight": "med ball",
+              "notes": "Per side. Max intent."
+            },
+            {
+              "liftId": "weighted-pull-up",
+              "exerciseName": "Weighted pull-up",
+              "blockLabel": "Block 2",
+              "sets": 5,
+              "reps": 3,
+              "weight": "weight belt",
+              "notes": "Heavy but explosive — pull up fast."
+            },
+            {
+              "liftId": "barbell-row",
+              "exerciseName": "Speed barbell row",
+              "blockLabel": "Block 2",
+              "sets": 6,
+              "reps": 3,
+              "weight": "55-65% 1RM",
+              "notes": "Dynamic effort. Max bar speed."
+            },
+            {
+              "liftId": "pendlay-row",
+              "exerciseName": "Pendlay row",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 5,
+              "weight": "barbell moderate-heavy",
+              "notes": "Each rep starts from the floor. Explosive concentric."
+            },
+            {
+              "liftId": "single-arm-db-row",
+              "exerciseName": "Single-arm DB row",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "DB heavy",
+              "notes": "Per side."
+            },
+            {
+              "liftId": "db-shrug",
+              "exerciseName": "DB shrug",
+              "blockLabel": "Block 3",
+              "sets": 3,
+              "reps": 6,
+              "weight": "DB heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "barbell-or-db-curl",
+              "exerciseName": "Barbell or DB curl",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "moderate-heavy",
+              "notes": ""
+            },
+            {
+              "liftId": "hammer-curl",
+              "exerciseName": "Hammer curl",
+              "blockLabel": "Block 4",
+              "sets": 3,
+              "reps": 8,
+              "weight": "DB moderate-heavy",
+              "notes": ""
             }
           ]
         }
