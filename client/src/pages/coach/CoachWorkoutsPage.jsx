@@ -253,6 +253,24 @@ export default function CoachWorkoutsPage() {
   }
 
   function closeMiscModal() {
+    // Flush any pending autosave before tearing down the form so the
+    // 500ms debounce window can't drop a final edit on close.
+    if (
+      miscModal.mode === "edit" &&
+      miscModal.miscId &&
+      validateMiscForm() === null
+    ) {
+      const body = buildMiscBody();
+      apiRequest(`/api/program-library/misc/${miscModal.miscId}`, {
+        method: "PUT",
+        token,
+        body
+      })
+        .then((data) => {
+          if (data?.library) setLibrary(data.library);
+        })
+        .catch(() => {});
+    }
     setMiscModal({ open: false, mode: "create", miscId: null });
     setMiscForm(createMiscForm());
     setMiscError("");
@@ -363,6 +381,31 @@ export default function CoachWorkoutsPage() {
     }
   }
 
+  // Autosave misc workouts in edit mode. Same pattern as the program
+  // autosave above — debounced PUT keyed off the misc form.
+  useEffect(() => {
+    if (!miscModal.open) return;
+    if (miscModal.mode !== "edit") return;
+    if (!miscModal.miscId) return;
+    if (validateMiscForm() !== null) return;
+
+    const timeout = setTimeout(async () => {
+      try {
+        const body = buildMiscBody();
+        const data = await apiRequest(
+          `/api/program-library/misc/${miscModal.miscId}`,
+          { method: "PUT", token, body }
+        );
+        if (data?.library) setLibrary(data.library);
+      } catch (e) {
+        setMiscError(e.message || "Autosave failed");
+      }
+    }, 500);
+
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [miscForm, miscModal.open, miscModal.mode, miscModal.miscId]);
+
   function requestMiscDelete() {
     if (miscModal.mode !== "edit") return;
     setPendingMiscDelete({ id: miscModal.miscId, name: miscForm.name });
@@ -408,6 +451,24 @@ export default function CoachWorkoutsPage() {
   }
 
   function closeProgramModal() {
+    // Flush any pending autosave before tearing down the form so the
+    // 500ms debounce window can't drop a final edit on close.
+    if (
+      programModal.mode === "edit" &&
+      programModal.programId &&
+      validateProgramForm() === null
+    ) {
+      const body = buildProgramBody();
+      apiRequest(`/api/program-library/programs/${programModal.programId}`, {
+        method: "PUT",
+        token,
+        body
+      })
+        .then((data) => {
+          if (data?.library) setLibrary(data.library);
+        })
+        .catch(() => {});
+    }
     setProgramModal({ open: false, mode: "create", programId: null });
     setProgramForm(createProgramForm());
     setProgramError("");
@@ -579,6 +640,36 @@ export default function CoachWorkoutsPage() {
       setProgramSubmitting(false);
     }
   }
+
+  // Autosave the program in edit mode whenever the form changes.
+  // Debounced so we don't PUT after every keystroke; sequenced via a
+  // ref so blurs in fast succession don't race. Create mode still
+  // requires the explicit "Create program" button to mint an id.
+  useEffect(() => {
+    if (!programModal.open) return;
+    if (programModal.mode !== "edit") return;
+    if (!programModal.programId) return;
+    if (validateProgramForm() !== null) return;
+
+    const timeout = setTimeout(async () => {
+      try {
+        const body = buildProgramBody();
+        const data = await apiRequest(
+          `/api/program-library/programs/${programModal.programId}`,
+          { method: "PUT", token, body }
+        );
+        if (data?.library) setLibrary(data.library);
+      } catch (e) {
+        setProgramError(e.message || "Autosave failed");
+      }
+    }, 500);
+
+    return () => clearTimeout(timeout);
+    // buildProgramBody/validateProgramForm read programForm, so the
+    // form ref is the only signal we need; other deps stabilize the
+    // effect identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programForm, programModal.open, programModal.mode, programModal.programId]);
 
   function requestProgramDelete(program) {
     setPendingDelete({ id: program.id, name: program.name });

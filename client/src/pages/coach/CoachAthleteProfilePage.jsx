@@ -268,6 +268,14 @@ export default function CoachAthleteProfilePage() {
   const [weekStart, setWeekStart] = useState(startOfWeek());
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [weeklyLifts, setWeeklyLifts] = useState([]);
+  // Lifts with unsaved field edits. Field edits autosave on blur via
+  // onCommitField → persistLift; this set just bridges the gap between
+  // the change firing and the PUT resolving. Structural changes (add /
+  // remove / reorder) still hit the server immediately because they
+  // require server-generated state (ids, orderIndex). The "Save week"
+  // button is the manual fallback for any rows still dirty.
+  const [dirtyLiftIds, setDirtyLiftIds] = useState(() => new Set());
+  const [savingWeek, setSavingWeek] = useState(false);
   const [manualLiftForm, setManualLiftForm] = useState(createManualLiftForm());
   const [newRehabNote, setNewRehabNote] = useState("");
   const [rehabProfileForm, setRehabProfileForm] = useState({
@@ -434,6 +442,7 @@ export default function CoachAthleteProfilePage() {
         });
         setRehabProfileForm(normalizeRehabProfileForm(profileData?.athlete?.rehabProfile));
         setWeeklyLifts(liftsData?.lifts || []);
+        setDirtyLiftIds(new Set());
         setRehabNotes(rehabData?.notes || []);
         setLibrary(libraryData?.library || null);
         setLibrarySummary(libraryData?.summary || null);
@@ -465,11 +474,25 @@ export default function CoachAthleteProfilePage() {
     };
   }, []);
 
+  // Surface the browser's native "leave site?" prompt when the coach
+  // has unsaved lift edits. Modern browsers ignore the custom string —
+  // returnValue just has to be non-empty to trigger the dialog.
+  useEffect(() => {
+    if (dirtyLiftIds.size === 0) return;
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirtyLiftIds]);
+
   async function refreshWeeklyLifts() {
     const data = await apiRequest(`/api/athletes/${athleteId}/lifts?week=${toDateInputValue(weekStart)}`, {
       token
     });
     setWeeklyLifts(data.lifts);
+    setDirtyLiftIds(new Set());
   }
 
   async function refreshRehabNotes() {
@@ -563,38 +586,64 @@ export default function CoachAthleteProfilePage() {
     }
   }
 
-  async function commitLiftField(liftId, field, rawValue) {
+  // Persists the current local snapshot of a single lift. Optional
+  // `overlay` merges a field/value not yet flushed into local state
+  // (used by onCommitField for selects that fire change+commit in the
+  // same tick). Returns the server-saved row on success; throws on
+  // failure so the batch saver can decide whether to clear the dirty
+  // flag.
+  async function persistLift(liftId, overlay = null) {
+    const ref = weeklyLiftsRef.current.find((l) => l.id === liftId);
+    if (!ref) return null;
+    const lift = overlay ? { ...ref, ...overlay } : ref;
+    const payload = {
+      ...lift,
+      sets: Number(lift.sets) || 1,
+      reps: Number(lift.reps) || 1,
+      date: toDateInputValue(lift.date)
+    };
+    const data = await apiRequest(`/api/athletes/${athleteId}/lifts/${liftId}`, {
+      method: "PUT",
+      token,
+      body: payload
+    });
+    const saved = data?.lift;
+    if (saved) {
+      setWeeklyLifts((current) =>
+        current.map((l) => (l.id === liftId ? { ...l, ...saved } : l))
+      );
+    }
+    return saved;
+  }
+
+  async function handleSaveWeek() {
+    if (savingWeek) return;
     setError("");
-    const lift = weeklyLiftsRef.current.find((l) => l.id === liftId);
-    if (!lift) return;
-    const value =
-      field === "sets" || field === "reps"
-        ? Number(rawValue) || 1
-        : rawValue;
-    // Skip the PUT when the optimistic state already matches what's
-    // on the server — avoids a network round-trip on focus-only blurs.
-    if (lift[field] === value) return;
+    setSavingWeek(true);
     try {
-      const payload = {
-        ...lift,
-        [field]: value,
-        sets: field === "sets" ? Number(value) || 1 : Number(lift.sets),
-        reps: field === "reps" ? Number(value) || 1 : Number(lift.reps),
-        date: toDateInputValue(lift.date)
-      };
-      const data = await apiRequest(`/api/athletes/${athleteId}/lifts/${liftId}`, {
-        method: "PUT",
-        token,
-        body: payload
-      });
-      const saved = data?.lift;
-      if (saved) {
-        setWeeklyLifts((current) =>
-          current.map((l) => (l.id === liftId ? { ...l, ...saved } : l))
-        );
+      if (dirtyLiftIds.size > 0) {
+        const ids = Array.from(dirtyLiftIds);
+        const results = await Promise.allSettled(ids.map((id) => persistLift(id)));
+        setDirtyLiftIds((current) => {
+          const next = new Set(current);
+          results.forEach((result, idx) => {
+            if (result.status === "fulfilled") next.delete(ids[idx]);
+          });
+          return next;
+        });
+        const failures = results.filter((r) => r.status === "rejected");
+        if (failures.length > 0) {
+          setError(failures[0].reason?.message || "Some lifts didn't save.");
+          return;
+        }
       }
-    } catch (updateError) {
-      setError(updateError.message);
+      // Round-trip to the server so what the coach sees matches what's
+      // persisted. Catches any silent drift between optimistic state
+      // and the row in the DB.
+      await refreshWeeklyLifts();
+      showStatus("Week saved.");
+    } finally {
+      setSavingWeek(false);
     }
   }
 
@@ -607,6 +656,12 @@ export default function CoachAthleteProfilePage() {
         token
       });
       setWeeklyLifts((current) => current.filter((lift) => lift.id !== liftId));
+      setDirtyLiftIds((current) => {
+        if (!current.has(liftId)) return current;
+        const next = new Set(current);
+        next.delete(liftId);
+        return next;
+      });
       showStatus("Lift removed.");
     } catch (deleteError) {
       setError(deleteError.message);
@@ -929,6 +984,12 @@ export default function CoachAthleteProfilePage() {
     setWeeklyLifts((current) =>
       current.map((lift) => (lift.id === liftId ? { ...lift, [field]: value } : lift))
     );
+    setDirtyLiftIds((current) => {
+      if (current.has(liftId)) return current;
+      const next = new Set(current);
+      next.add(liftId);
+      return next;
+    });
   }
 
   function toggleManualLiftDate(dateKey) {
@@ -1296,13 +1357,32 @@ export default function CoachAthleteProfilePage() {
                     <p className="eyebrow">Selected Day</p>
                     <h3>{formatLongDate(selectedDay)}</h3>
                   </div>
-                  <button
-                    type="button"
-                    className="primary-button desktop-button builder-add-lift"
-                    onClick={handleAddLiftForSelectedDay}
-                  >
-                    + Add lift
-                  </button>
+                  <div className="day-program-actions">
+                    {dirtyLiftIds.size > 0 ? (
+                      <span className="day-program-dirty" aria-live="polite">
+                        {dirtyLiftIds.size} unsaved
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="primary-button desktop-button builder-save-week"
+                      onClick={handleSaveWeek}
+                      disabled={savingWeek}
+                    >
+                      {savingWeek
+                        ? "Saving…"
+                        : dirtyLiftIds.size > 0
+                          ? `Save ${dirtyLiftIds.size} change${dirtyLiftIds.size === 1 ? "" : "s"}`
+                          : "Save week"}
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button desktop-button builder-add-lift"
+                      onClick={handleAddLiftForSelectedDay}
+                    >
+                      + Add lift
+                    </button>
+                  </div>
                 </div>
 
                 <LiftTable
@@ -1328,9 +1408,26 @@ export default function CoachAthleteProfilePage() {
                     const target = selectedDayLifts[liftIdx];
                     if (target) updateLiftField(target.id, field, value);
                   }}
-                  onCommitField={(_dayIdx, liftIdx, field, value) => {
+                  onCommitField={async (_dayIdx, liftIdx, field, value) => {
                     const target = selectedDayLifts[liftIdx];
-                    if (target) commitLiftField(target.id, field, value);
+                    if (!target) return;
+                    const liftId = target.id;
+                    // Merge the freshly-committed field onto the latest
+                    // ref snapshot. Necessary because the block select
+                    // fires onChange + onCommitField in the same tick,
+                    // so weeklyLiftsRef may not yet reflect the new
+                    // value when we PUT.
+                    try {
+                      await persistLift(liftId, { [field]: value });
+                      setDirtyLiftIds((current) => {
+                        if (!current.has(liftId)) return current;
+                        const next = new Set(current);
+                        next.delete(liftId);
+                        return next;
+                      });
+                    } catch (saveError) {
+                      setError(saveError.message || "Failed to save lift.");
+                    }
                   }}
                   onRemoveLift={(_dayIdx, liftIdx) => {
                     const target = selectedDayLifts[liftIdx];
