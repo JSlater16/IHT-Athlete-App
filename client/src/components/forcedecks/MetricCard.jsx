@@ -10,22 +10,36 @@ function formatValue(value) {
   return value.toFixed(3);
 }
 
-function badgeFor(value, best) {
+function deltaVsPrevious(value, previousValue) {
+  if (
+    !Number.isFinite(value) ||
+    !Number.isFinite(previousValue) ||
+    previousValue === 0
+  ) {
+    return null;
+  }
+  const pct = ((value - previousValue) / previousValue) * 100;
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct).toFixed(1)}% from last`;
+}
+
+function badgeFor(value, best, previousValue) {
   if (value == null || best == null || !Number.isFinite(value) || !Number.isFinite(best) || best === 0) {
     return null;
   }
   const pct = ((value - best) / best) * 100;
   // Match-PR threshold of 0.05% absorbs float noise from re-imports.
   if (Math.abs(pct) < 0.05) {
-    return { tone: "pr", label: "PR" };
+    const delta = deltaVsPrevious(value, previousValue);
+    return { tone: "pr", label: delta ? `PR · ${delta}` : "PR" };
   }
   const tone = pct < 0 ? "down" : "up";
   const sign = pct > 0 ? "+" : "−";
   return { tone, label: `${sign}${Math.abs(pct).toFixed(1)}% from PR` };
 }
 
-export default function MetricCard({ label, value, unit, sparklineData, best, onClick }) {
-  const badge = badgeFor(value, best);
+export default function MetricCard({ label, value, unit, sparklineData, best, previousValue, onClick }) {
+  const badge = badgeFor(value, best, previousValue);
   const interactive = typeof onClick === "function";
 
   const content = (

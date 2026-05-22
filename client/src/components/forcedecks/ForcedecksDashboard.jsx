@@ -95,6 +95,7 @@ function Body({ data, includeCoachMetrics, onSelectMetric }) {
       <div className="fd-metric-grid">
         {metrics.map((m) => {
           const latestValue = latest?.metrics?.[m.key]?.value ?? null;
+          const previousValue = data.tests[1]?.metrics?.[m.key]?.value ?? null;
           const unit = latest?.metrics?.[m.key]?.unit ?? m.unit;
           return (
             <MetricCard
@@ -104,6 +105,7 @@ function Body({ data, includeCoachMetrics, onSelectMetric }) {
               unit={unit}
               sparklineData={sparklineForMetric(data.tests, m.key)}
               best={data.bests?.[m.key] ?? null}
+              previousValue={previousValue}
               onClick={() => onSelectMetric({ key: m.key, label: m.label, unit })}
             />
           );
