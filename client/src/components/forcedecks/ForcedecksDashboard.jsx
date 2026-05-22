@@ -20,6 +20,7 @@ export default function ForcedecksDashboard({ scope, athleteId, headerSlot }) {
   const { token, user } = useAuth();
   const [state, setState] = useState({ status: "loading", data: null, error: null });
   const [openMetric, setOpenMetric] = useState(null);
+  const [compareMode, setCompareMode] = useState("previous");
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -56,6 +57,8 @@ export default function ForcedecksDashboard({ scope, athleteId, headerSlot }) {
           <Body
             data={state.data}
             includeCoachMetrics={includeCoachMetrics}
+            compareMode={compareMode}
+            onCompareModeChange={setCompareMode}
             onSelectMetric={setOpenMetric}
           />
         )}
@@ -74,11 +77,12 @@ export default function ForcedecksDashboard({ scope, athleteId, headerSlot }) {
   );
 }
 
-function Body({ data, includeCoachMetrics, onSelectMetric }) {
+function Body({ data, includeCoachMetrics, compareMode, onCompareModeChange, onSelectMetric }) {
   const latest = data.tests[0];
   const metrics = (data.metricCatalog || []).filter((m) =>
     includeCoachMetrics ? true : !m.coachOnly
   );
+  const compareLabel = compareMode === "first" ? "first" : "last";
 
   return (
     <>
@@ -92,10 +96,37 @@ function Body({ data, includeCoachMetrics, onSelectMetric }) {
         </div>
       </div>
 
+      <div className="fd-compare-bar">
+        <span className="fd-compare-bar-label">PR compare</span>
+        <div className="lb-toggle" role="tablist" aria-label="PR comparison mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={compareMode === "previous"}
+            className={`lb-toggle-btn ${compareMode === "previous" ? "is-active" : ""}`}
+            onClick={() => onCompareModeChange("previous")}
+          >
+            vs Previous
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={compareMode === "first"}
+            className={`lb-toggle-btn ${compareMode === "first" ? "is-active" : ""}`}
+            onClick={() => onCompareModeChange("first")}
+          >
+            vs First Session
+          </button>
+        </div>
+      </div>
+
       <div className="fd-metric-grid">
         {metrics.map((m) => {
           const latestValue = latest?.metrics?.[m.key]?.value ?? null;
-          const previousValue = data.tests[1]?.metrics?.[m.key]?.value ?? null;
+          const compareValue =
+            compareMode === "first"
+              ? data.firsts?.[m.key] ?? null
+              : data.tests[1]?.metrics?.[m.key]?.value ?? null;
           const unit = latest?.metrics?.[m.key]?.unit ?? m.unit;
           return (
             <MetricCard
@@ -105,7 +136,8 @@ function Body({ data, includeCoachMetrics, onSelectMetric }) {
               unit={unit}
               sparklineData={sparklineForMetric(data.tests, m.key)}
               best={data.bests?.[m.key] ?? null}
-              previousValue={previousValue}
+              compareValue={compareValue}
+              compareLabel={compareLabel}
               onClick={() => onSelectMetric({ key: m.key, label: m.label, unit })}
             />
           );

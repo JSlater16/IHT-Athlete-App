@@ -66,9 +66,27 @@ async function loadAthleteDashboard(athleteId, limit) {
     }
   }
 
+  // Earliest recorded value per metric — powers the "PR vs first
+  // session ever" compare mode. Skips zero/negative readings so a
+  // missing-data row never becomes a misleading baseline.
+  const firstTest = await prisma.forceDecksTest.findFirst({
+    where: { athleteId, metrics: { some: { value: { gt: 0 } } } },
+    orderBy: { testDate: "asc" },
+    include: { metrics: true }
+  });
+  const firsts = {};
+  if (firstTest) {
+    for (const m of firstTest.metrics) {
+      if (Number.isFinite(m.value) && m.value > 0) {
+        firsts[m.metricName] = m.value;
+      }
+    }
+  }
+
   return {
     tests: tests.map(serializeTest),
     bests,
+    firsts,
     metricCatalog: METRICS
   };
 }
