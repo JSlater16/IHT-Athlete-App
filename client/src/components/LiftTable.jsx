@@ -87,7 +87,6 @@ export default function LiftTable({
             const rowKey = `${dayIndex}-${liftIndex}`;
             const matched = lookup.get(normalizeText(lift.exerciseName));
             const willCreate = lift.exerciseName.trim() && !matched;
-            const isDraft = !lift.exerciseName.trim();
             return (
               <tr key={rowKey} className="lift-table-row">
                 {showDayColumn ? (
@@ -138,11 +137,6 @@ export default function LiftTable({
                   {liftByNormalizedName && willCreate ? (
                     <span className="muted-copy compact-copy lift-table-newlift-hint">
                       New library lift on save
-                    </span>
-                  ) : null}
-                  {isDraft ? (
-                    <span className="muted-copy compact-copy lift-table-draft-hint">
-                      Draft — won't save until named
                     </span>
                   ) : null}
                 </td>
