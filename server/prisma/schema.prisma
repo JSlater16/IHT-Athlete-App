@@ -41,14 +41,11 @@ model AthleteProfile {
   hideFromLeaderboard     Boolean          @default(false)
   valdProfileId           String?          @unique
   valdLastSyncedAt        DateTime?
-  onezeroProfileId        String?          @unique
-  onezeroLastSyncedAt     DateTime?
   updatedAt               DateTime         @updatedAt
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   lifts           Lift[]
   rehabNotes      RehabNote[]
   forcedecksTests ForceDecksTest[]
-  sprintSessions  SprintSession[]
 }
 
 model Lift {
@@ -124,49 +121,6 @@ model ForceDecksMetric {
   @@index([metricName])
 }
 
-// 1080 Motion (1080 Sprint) session data. A single coach-driven test
-// session usually contains multiple sprints across varying resistance
-// loads (e.g., for a force-velocity profile). Each Sprint row holds
-// the headline kinematics inline because they're universal across the
-// device; anything 1080 returns beyond those lives in `metricsJson`
-// as { key: { value, unit } } so we don't have to migrate every time
-// the API surfaces a new field.
-model SprintSession {
-  id          String         @id @default(cuid())
-  athleteId   String
-  sessionDate DateTime
-  source      String         @default("onezero")
-  externalId  String?        @unique
-  notes       String         @default("")
-  createdAt   DateTime       @default(now())
-  athlete     AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  sprints     Sprint[]
-
-  @@index([athleteId, sessionDate])
-}
-
-model Sprint {
-  id           String        @id @default(cuid())
-  sessionId    String
-  orderIndex   Int           @default(0)
-  // Resistance setting on 1080 (kg). 0 = unloaded.
-  load         Float
-  // Sprint distance in meters. Required for the leaderboard's
-  // minimum-distance guard (peak velocity is only honest once the
-  // sprint clears the acceleration phase).
-  distance     Float
-  // Headline kinematics — populated for every sprint by the device.
-  peakVelocity Float?
-  peakPower    Float?
-  peakForce    Float?
-  // Anything else from 1080 (split times, mean values, F-v outputs,
-  // etc.) — stored as { metricKey: { value, unit } }.
-  metricsJson  Json?
-  session      SprintSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
-}
-
 // Audit trail for high-trust admin actions (coach lifecycle, athlete
 // deletion, password resets, auth attempts). Actor + target are stored
 // as snapshotted strings rather than foreign keys so the row survives
@@ -189,15 +143,4 @@ model AuditLog {
   @@index([action])
   @@index([targetId])
   @@index([actorId])
-}
-
-// Program library lives as a single JSON blob in Postgres so it
-// survives Render's ephemeral filesystem. The id is pinned to 1 so
-// reads/writes always target the same row. On first read the row is
-// seeded from server/data/programLibrary.json (the source-controlled
-// initial state); after that the DB is the source of truth.
-model ProgramLibraryStore {
-  id        Int      @id @default(1)
-  data      Json
-  updatedAt DateTime @updatedAt
 }

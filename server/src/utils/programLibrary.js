@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs/promises");
-const { prisma } = require("./prisma");
 const {
   standardProgramVariant,
   eccentricProgramVariants,
@@ -10,49 +9,25 @@ const {
 const LIBRARY_FILE = path.resolve(__dirname, "..", "..", "data", "programLibrary.json");
 const allowedFrequencies = new Set([3, 4, 5]);
 
-// Source of truth lives in Postgres so the library survives Render's
-// ephemeral filesystem. The JSON file at LIBRARY_FILE is only the
-// initial seed used to populate the DB row on first read of a fresh
-// environment.
 async function readProgramLibrary() {
-  let row = await prisma.programLibraryStore.findUnique({ where: { id: 1 } });
-  if (!row) {
-    const seed = await readLibraryFromFile();
-    row = await prisma.programLibraryStore.upsert({
-      where: { id: 1 },
-      create: { id: 1, data: seed },
-      update: {}
-    });
-  }
-  const library = row.data && typeof row.data === "object" ? row.data : {};
+  const file = await fs.readFile(LIBRARY_FILE, "utf8");
+  const parsed = JSON.parse(file);
   // Older library files only had liftLibrary + programs. Default the
   // new miscWorkouts slot so callers don't have to null-check.
-  if (!Array.isArray(library.miscWorkouts)) {
-    library.miscWorkouts = [];
+  if (!Array.isArray(parsed.miscWorkouts)) {
+    parsed.miscWorkouts = [];
   }
-  return library;
+  return parsed;
 }
 
 async function writeProgramLibrary(library) {
-  await prisma.programLibraryStore.upsert({
-    where: { id: 1 },
-    create: { id: 1, data: library },
-    update: { data: library }
-  });
-}
-
-// Used only on first-ever read to seed the DB row. Treats a missing
-// file as an empty library so a brand-new environment doesn't crash.
-async function readLibraryFromFile() {
-  try {
-    const file = await fs.readFile(LIBRARY_FILE, "utf8");
-    return JSON.parse(file);
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return { liftLibrary: [], programs: [], miscWorkouts: [] };
-    }
-    throw error;
-  }
+  // Atomic: write to a temp file in the same directory, then rename
+  // over the real one. If the process dies mid-write the original is
+  // intact. fs.rename is atomic on POSIX when source/target share a
+  // filesystem (they always do here — same dir).
+  const tmp = `${LIBRARY_FILE}.tmp-${process.pid}-${Date.now()}`;
+  await fs.writeFile(tmp, JSON.stringify(library, null, 2), "utf8");
+  await fs.rename(tmp, LIBRARY_FILE);
 }
 
 // Validates a proposed library shape and throws a 400-coded error if
