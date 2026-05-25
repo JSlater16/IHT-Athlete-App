@@ -123,6 +123,28 @@ function miscToForm(workout) {
   };
 }
 
+// A lift row is "complete enough to ship to the server" when it has
+// a trimmed name and positive numeric sets/reps and a non-empty
+// weight. Rows that fail this check are drafts — they live in client
+// state only.
+function isCompleteLiftRow(lift) {
+  if (!lift) return false;
+  if (typeof lift.exerciseName !== "string" || lift.exerciseName.trim().length === 0) {
+    return false;
+  }
+  if (!Number.isFinite(Number(lift.sets)) || Number(lift.sets) < 1) return false;
+  if (!Number.isFinite(Number(lift.reps)) || Number(lift.reps) < 1) return false;
+  if (typeof lift.weight !== "string" || lift.weight.trim().length === 0) return false;
+  return true;
+}
+
+// True when each day has at least one complete lift. Misc workouts
+// have a single bucket, so we pass `[{ lifts: form.lifts }]`.
+function eachDayHasCompleteLift(days) {
+  if (!Array.isArray(days) || days.length === 0) return false;
+  return days.every((day) => (day.lifts || []).some(isCompleteLiftRow));
+}
+
 function summarizeMiscBlocks(workout) {
   const counts = new Map();
   for (const lift of workout.lifts || []) {
@@ -254,11 +276,15 @@ export default function CoachWorkoutsPage() {
 
   function closeMiscModal() {
     // Flush any pending autosave before tearing down the form so the
-    // 500ms debounce window can't drop a final edit on close.
+    // 500ms debounce window can't drop a final edit on close. Same
+    // permissive gate as the autosave effect — draft rows are dropped
+    // by buildMiscBody, not by this gate. setLibrary is wanted here
+    // so the cards list refreshes once the modal closes.
     if (
       miscModal.mode === "edit" &&
       miscModal.miscId &&
-      validateMiscForm() === null
+      miscForm.name.trim() &&
+      eachDayHasCompleteLift([{ lifts: miscForm.lifts }])
     ) {
       const body = buildMiscBody();
       apiRequest(`/api/program-library/misc/${miscModal.miscId}`, {
@@ -312,7 +338,7 @@ export default function CoachWorkoutsPage() {
   function buildMiscBody() {
     return {
       name: miscForm.name.trim(),
-      lifts: miscForm.lifts.map((lift) => {
+      lifts: miscForm.lifts.filter(isCompleteLiftRow).map((lift) => {
         const trimmedName = lift.exerciseName.trim();
         const matched = liftByNormalizedName.get(normalizeText(trimmedName));
         const liftId = matched?.id || lift.liftId || "";
@@ -340,24 +366,39 @@ export default function CoachWorkoutsPage() {
     };
   }
 
+  // Returns { error, draftCount }. Drafts (rows with no exercise
+  // name) are counted but not blocking — they're silently dropped at
+  // build time and the user is told how many were skipped. Typos in
+  // named rows (bad sets/reps/weight) are blocking errors.
   function validateMiscForm() {
-    if (!miscForm.name.trim()) return "Workout name is required.";
-    if (miscForm.lifts.length === 0) return "Add at least one lift.";
+    if (!miscForm.name.trim()) return { error: "Workout name is required.", draftCount: 0 };
+    if (miscForm.lifts.length === 0) return { error: "Add at least one lift.", draftCount: 0 };
+    let draftCount = 0;
+    let completeCount = 0;
     for (let liftIndex = 0; liftIndex < miscForm.lifts.length; liftIndex += 1) {
       const lift = miscForm.lifts[liftIndex];
-      if (!lift.exerciseName.trim()) return `Lift ${liftIndex + 1}: exercise is required.`;
-      if (Number(lift.sets) < 1 || Number(lift.reps) < 1) {
-        return `Lift ${liftIndex + 1}: sets and reps must be at least 1.`;
+      if (!lift.exerciseName.trim()) {
+        draftCount += 1;
+        continue;
       }
-      if (!lift.weight.trim()) return `Lift ${liftIndex + 1}: weight is required.`;
+      if (Number(lift.sets) < 1 || Number(lift.reps) < 1) {
+        return { error: `Lift ${liftIndex + 1}: sets and reps must be at least 1.`, draftCount };
+      }
+      if (!lift.weight.trim()) {
+        return { error: `Lift ${liftIndex + 1}: weight is required.`, draftCount };
+      }
+      completeCount += 1;
     }
-    return null;
+    if (completeCount === 0) {
+      return { error: "Add at least one named lift.", draftCount };
+    }
+    return { error: null, draftCount };
   }
 
   async function handleSaveMisc(event) {
     event.preventDefault();
     setMiscError("");
-    const validationError = validateMiscForm();
+    const { error: validationError, draftCount } = validateMiscForm();
     if (validationError) {
       setMiscError(validationError);
       return;
@@ -373,7 +414,12 @@ export default function CoachWorkoutsPage() {
       if (!data?.library) throw new Error("Unexpected response from server.");
       setLibrary(data.library);
       closeMiscModal();
-      setToast(isEdit ? "Workout saved." : "Workout created.");
+      const baseToast = isEdit ? "Workout saved." : "Workout created.";
+      setToast(
+        draftCount > 0
+          ? `${baseToast} ${draftCount} draft row${draftCount === 1 ? "" : "s"} skipped — name the exercise to include.`
+          : baseToast
+      );
     } catch (e) {
       setMiscError(e.message);
     } finally {
@@ -382,21 +428,25 @@ export default function CoachWorkoutsPage() {
   }
 
   // Autosave misc workouts in edit mode. Same pattern as the program
-  // autosave above — debounced PUT keyed off the misc form.
+  // autosave above — debounced PUT keyed off the misc form. Gate is
+  // "form has a name + at least one complete lift"; draft rows are
+  // dropped by buildMiscBody. We deliberately skip setLibrary on the
+  // autosave response to avoid stale responses clobbering newer local
+  // edits — the modal's form state is the source of truth while open.
   useEffect(() => {
     if (!miscModal.open) return;
     if (miscModal.mode !== "edit") return;
     if (!miscModal.miscId) return;
-    if (validateMiscForm() !== null) return;
+    if (!miscForm.name.trim()) return;
+    if (!eachDayHasCompleteLift([{ lifts: miscForm.lifts }])) return;
 
     const timeout = setTimeout(async () => {
       try {
         const body = buildMiscBody();
-        const data = await apiRequest(
+        await apiRequest(
           `/api/program-library/misc/${miscModal.miscId}`,
           { method: "PUT", token, body }
         );
-        if (data?.library) setLibrary(data.library);
       } catch (e) {
         setMiscError(e.message || "Autosave failed");
       }
@@ -452,11 +502,15 @@ export default function CoachWorkoutsPage() {
 
   function closeProgramModal() {
     // Flush any pending autosave before tearing down the form so the
-    // 500ms debounce window can't drop a final edit on close.
+    // 500ms debounce window can't drop a final edit on close. Same
+    // permissive gate as the autosave effect — draft rows are dropped
+    // by buildProgramBody, not by this gate. setLibrary is wanted
+    // here so the cards list refreshes once the modal closes.
     if (
       programModal.mode === "edit" &&
       programModal.programId &&
-      validateProgramForm() === null
+      programForm.name.trim() &&
+      eachDayHasCompleteLift(programForm.days)
     ) {
       const body = buildProgramBody();
       apiRequest(`/api/program-library/programs/${programModal.programId}`, {
@@ -562,7 +616,10 @@ export default function CoachWorkoutsPage() {
       frequency: Number(programForm.frequency),
       days: programForm.days.map((day) => ({
         dayOffset: Number(day.dayOffset),
-        lifts: day.lifts.map((lift) => {
+        // Drop draft rows — partially-typed lifts stay in client state
+        // until they're complete, then they join the saved set on the
+        // next autosave.
+        lifts: day.lifts.filter(isCompleteLiftRow).map((lift) => {
           const trimmedName = lift.exerciseName.trim();
           const matched = liftByNormalizedName.get(normalizeText(trimmedName));
           const liftId = matched?.id || lift.liftId || "";
@@ -591,31 +648,51 @@ export default function CoachWorkoutsPage() {
     };
   }
 
+  // Returns { error, draftCount }. Same draft semantics as
+  // validateMiscForm — empty-name rows are counted but not blocking.
   function validateProgramForm() {
-    if (!programForm.name.trim()) return "Program name is required.";
+    if (!programForm.name.trim()) return { error: "Program name is required.", draftCount: 0 };
+    let draftCount = 0;
     for (let dayIndex = 0; dayIndex < programForm.days.length; dayIndex += 1) {
       const day = programForm.days[dayIndex];
-      if (!day.lifts.length) return `Day ${dayIndex + 1} needs at least one exercise.`;
+      if (!day.lifts.length) {
+        return { error: `Day ${dayIndex + 1} needs at least one exercise.`, draftCount };
+      }
+      let dayHasComplete = false;
       for (let liftIndex = 0; liftIndex < day.lifts.length; liftIndex += 1) {
         const lift = day.lifts[liftIndex];
         if (!lift.exerciseName.trim()) {
-          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: exercise name is required.`;
+          draftCount += 1;
+          continue;
         }
         if (Number(lift.sets) < 1 || Number(lift.reps) < 1) {
-          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: sets and reps must be at least 1.`;
+          return {
+            error: `Day ${dayIndex + 1}, lift ${liftIndex + 1}: sets and reps must be at least 1.`,
+            draftCount
+          };
         }
         if (!lift.weight.trim()) {
-          return `Day ${dayIndex + 1}, lift ${liftIndex + 1}: weight is required.`;
+          return {
+            error: `Day ${dayIndex + 1}, lift ${liftIndex + 1}: weight is required.`,
+            draftCount
+          };
         }
+        dayHasComplete = true;
+      }
+      if (!dayHasComplete) {
+        return {
+          error: `Day ${dayIndex + 1} needs at least one exercise with a name.`,
+          draftCount
+        };
       }
     }
-    return null;
+    return { error: null, draftCount };
   }
 
   async function handleSaveProgram(event) {
     event.preventDefault();
     setProgramError("");
-    const validationError = validateProgramForm();
+    const { error: validationError, draftCount } = validateProgramForm();
     if (validationError) {
       setProgramError(validationError);
       return;
@@ -633,7 +710,12 @@ export default function CoachWorkoutsPage() {
       if (!data?.library) throw new Error("Unexpected response from server.");
       setLibrary(data.library);
       closeProgramModal();
-      setToast(isEdit ? "Program saved." : "Program created.");
+      const baseToast = isEdit ? "Program saved." : "Program created.";
+      setToast(
+        draftCount > 0
+          ? `${baseToast} ${draftCount} draft row${draftCount === 1 ? "" : "s"} skipped — name the exercise to include.`
+          : baseToast
+      );
     } catch (e) {
       setProgramError(e.message);
     } finally {
@@ -642,23 +724,27 @@ export default function CoachWorkoutsPage() {
   }
 
   // Autosave the program in edit mode whenever the form changes.
-  // Debounced so we don't PUT after every keystroke; sequenced via a
-  // ref so blurs in fast succession don't race. Create mode still
-  // requires the explicit "Create program" button to mint an id.
+  // Debounced so we don't PUT after every keystroke. Create mode
+  // still requires the explicit "Create program" button to mint an
+  // id. The gate is permissive ("name set + every day has ≥1
+  // complete lift") so an in-progress draft row doesn't block edits
+  // to completed rows; buildProgramBody drops drafts before PUTting.
+  // We skip setLibrary on the response so a slow PUT can't clobber
+  // newer local edits when it finally lands.
   useEffect(() => {
     if (!programModal.open) return;
     if (programModal.mode !== "edit") return;
     if (!programModal.programId) return;
-    if (validateProgramForm() !== null) return;
+    if (!programForm.name.trim()) return;
+    if (!eachDayHasCompleteLift(programForm.days)) return;
 
     const timeout = setTimeout(async () => {
       try {
         const body = buildProgramBody();
-        const data = await apiRequest(
+        await apiRequest(
           `/api/program-library/programs/${programModal.programId}`,
           { method: "PUT", token, body }
         );
-        if (data?.library) setLibrary(data.library);
       } catch (e) {
         setProgramError(e.message || "Autosave failed");
       }

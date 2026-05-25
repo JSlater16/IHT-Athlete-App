@@ -485,6 +485,33 @@
   align-self: start;
 }
 
+.day-program-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.builder-save-week {
+  align-self: start;
+}
+
+.builder-save-week:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.day-program-dirty {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent-soft, rgba(255, 184, 0, 0.18));
+  color: var(--accent-ink, #8a5a00);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .lift-table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -555,6 +582,13 @@
 }
 
 .lift-table-newlift-hint {
+  display: block;
+  padding-left: 0.55rem;
+  padding-top: 0.15rem;
+  font-style: italic;
+}
+
+.lift-table-draft-hint {
   display: block;
   padding-left: 0.55rem;
   padding-top: 0.15rem;
