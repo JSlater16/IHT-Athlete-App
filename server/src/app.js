@@ -38,15 +38,29 @@ function buildAllowedOrigins() {
 
 const allowedOrigins = buildAllowedOrigins();
 
+// Origins used by the Capacitor-wrapped iOS + Android apps. Their
+// WebViews load the bundle from a local scheme rather than the
+// deployed URL, so they don't match CLIENT_URL but still need API
+// access. Hard-coded because they're fixed by the Capacitor runtime.
+const NATIVE_APP_ORIGINS = new Set([
+  "capacitor://localhost",
+  "https://localhost",
+  "ionic://localhost"
+]);
+
 app.use(
   cors({
     origin(origin, callback) {
       /* Allow same-origin / curl (no Origin header). Cross-origin
-         requests must come from an explicitly configured CLIENT_URL.
-         Fail-closed: if the operator forgot to set CLIENT_URL, we
-         reject browser CORS requests rather than silently allowing
-         any origin. */
+         requests must come from an explicitly configured CLIENT_URL
+         or the Capacitor native-app allowlist. Fail-closed: if the
+         operator forgot to set CLIENT_URL, we still allow native-app
+         origins but reject everything else. */
       if (!origin) {
+        return callback(null, true);
+      }
+
+      if (NATIVE_APP_ORIGINS.has(origin)) {
         return callback(null, true);
       }
 
