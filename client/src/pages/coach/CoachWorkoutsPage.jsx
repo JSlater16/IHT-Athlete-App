@@ -167,6 +167,12 @@ export default function CoachWorkoutsPage() {
   const [activeSegment, setActiveSegment] = useState(0); // active day index OR active block index
   const focusNextRowRef = useRef(null);
 
+  // CSV import
+  const csvInputRef = useRef(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importReport, setImportReport] = useState(null);
+
   useEffect(() => {
     const ctrl = new AbortController();
     loadLibrary(ctrl.signal);
@@ -255,11 +261,7 @@ export default function CoachWorkoutsPage() {
   function closeMiscModal() {
     // Flush any pending autosave before tearing down the form so the
     // 500ms debounce window can't drop a final edit on close.
-    if (
-      miscModal.mode === "edit" &&
-      miscModal.miscId &&
-      validateMiscForm() === null
-    ) {
+    if (miscModal.mode === "edit" && miscModal.miscId) {
       const body = buildMiscBody();
       apiRequest(`/api/program-library/misc/${miscModal.miscId}`, {
         method: "PUT",
@@ -357,15 +359,17 @@ export default function CoachWorkoutsPage() {
   async function handleSaveMisc(event) {
     event.preventDefault();
     setMiscError("");
-    const validationError = validateMiscForm();
-    if (validationError) {
-      setMiscError(validationError);
-      return;
+    const isEdit = miscModal.mode === "edit";
+    if (!isEdit) {
+      const validationError = validateMiscForm();
+      if (validationError) {
+        setMiscError(validationError);
+        return;
+      }
     }
     setMiscSubmitting(true);
     try {
       const body = buildMiscBody();
-      const isEdit = miscModal.mode === "edit";
       const data = await apiRequest(
         isEdit ? `/api/program-library/misc/${miscModal.miscId}` : "/api/program-library/misc",
         { method: isEdit ? "PUT" : "POST", token, body }
@@ -382,12 +386,12 @@ export default function CoachWorkoutsPage() {
   }
 
   // Autosave misc workouts in edit mode. Same pattern as the program
-  // autosave above — debounced PUT keyed off the misc form.
+  // autosave above — debounced PUT keyed off the misc form, fires
+  // regardless of local row completeness.
   useEffect(() => {
     if (!miscModal.open) return;
     if (miscModal.mode !== "edit") return;
     if (!miscModal.miscId) return;
-    if (validateMiscForm() !== null) return;
 
     const timeout = setTimeout(async () => {
       try {
@@ -397,6 +401,7 @@ export default function CoachWorkoutsPage() {
           { method: "PUT", token, body }
         );
         if (data?.library) setLibrary(data.library);
+        setMiscError("");
       } catch (e) {
         setMiscError(e.message || "Autosave failed");
       }
@@ -452,12 +457,11 @@ export default function CoachWorkoutsPage() {
 
   function closeProgramModal() {
     // Flush any pending autosave before tearing down the form so the
-    // 500ms debounce window can't drop a final edit on close.
-    if (
-      programModal.mode === "edit" &&
-      programModal.programId &&
-      validateProgramForm() === null
-    ) {
+    // 500ms debounce window can't drop a final edit on close. The
+    // local validateProgramForm check used to gate this — removed
+    // because partial rows are now server-accepted and skipping the
+    // flush was what caused edits to vanish on modal close.
+    if (programModal.mode === "edit" && programModal.programId) {
       const body = buildProgramBody();
       apiRequest(`/api/program-library/programs/${programModal.programId}`, {
         method: "PUT",
@@ -615,15 +619,20 @@ export default function CoachWorkoutsPage() {
   async function handleSaveProgram(event) {
     event.preventDefault();
     setProgramError("");
-    const validationError = validateProgramForm();
-    if (validationError) {
-      setProgramError(validationError);
-      return;
+    const isEdit = programModal.mode === "edit";
+    // Only block create-mode publish on local completeness. Edit mode
+    // trusts the server's lenient acceptance — partial rows persist
+    // and won't be silently dropped from the saved program.
+    if (!isEdit) {
+      const validationError = validateProgramForm();
+      if (validationError) {
+        setProgramError(validationError);
+        return;
+      }
     }
     setProgramSubmitting(true);
     try {
       const body = buildProgramBody();
-      const isEdit = programModal.mode === "edit";
       const data = await apiRequest(
         isEdit
           ? `/api/program-library/programs/${programModal.programId}`
@@ -642,14 +651,15 @@ export default function CoachWorkoutsPage() {
   }
 
   // Autosave the program in edit mode whenever the form changes.
-  // Debounced so we don't PUT after every keystroke; sequenced via a
-  // ref so blurs in fast succession don't race. Create mode still
-  // requires the explicit "Create program" button to mint an id.
+  // Debounced so we don't PUT after every keystroke. Fires regardless
+  // of whether every row is "complete" — the server now accepts
+  // partial rows and drops truly-empty drafts, so gating autosave on
+  // local validation was hiding edits behind silent failures (commit
+  // history: that's what made edits appear to "delete the row").
   useEffect(() => {
     if (!programModal.open) return;
     if (programModal.mode !== "edit") return;
     if (!programModal.programId) return;
-    if (validateProgramForm() !== null) return;
 
     const timeout = setTimeout(async () => {
       try {
@@ -659,15 +669,15 @@ export default function CoachWorkoutsPage() {
           { method: "PUT", token, body }
         );
         if (data?.library) setLibrary(data.library);
+        setProgramError("");
       } catch (e) {
         setProgramError(e.message || "Autosave failed");
       }
     }, 500);
 
     return () => clearTimeout(timeout);
-    // buildProgramBody/validateProgramForm read programForm, so the
-    // form ref is the only signal we need; other deps stabilize the
-    // effect identity.
+    // buildProgramBody reads programForm, so the form ref is the only
+    // signal we need; other deps stabilize the effect identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programForm, programModal.open, programModal.mode, programModal.programId]);
 
@@ -694,6 +704,33 @@ export default function CoachWorkoutsPage() {
     }
   }
 
+  async function handleImportCsvSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    setImportError("");
+    setImportReport(null);
+    setImporting(true);
+    try {
+      const content = await file.text();
+      const data = await apiRequest("/api/program-library/csv-import", {
+        method: "POST",
+        token,
+        body: { content }
+      });
+      if (data?.library) setLibrary(data.library);
+      if (data?.importReport) setImportReport(data.importReport);
+      setToast(
+        `Imported ${data?.importReport?.programsImported?.length ?? 0} programs · ` +
+        `+${data?.importReport?.liftsAdded ?? 0} new lifts`
+      );
+    } catch (e) {
+      setImportError(e.message || "Import failed.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   // ------- Render -------
 
   return (
@@ -706,11 +743,42 @@ export default function CoachWorkoutsPage() {
           <h2>Program library</h2>
         </div>
         <div className="header-action-row">
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: "none" }}
+            onChange={handleImportCsvSelected}
+          />
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => csvInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? "Importing..." : "Import CSV"}
+          </button>
           <button className="primary-button" type="button" onClick={() => openProgramCreate()}>
             New program
           </button>
         </div>
       </section>
+
+      {importError ? (
+        <p className="form-error">{importError}</p>
+      ) : null}
+      {importReport ? (
+        <p className="muted-copy compact-copy">
+          Imported {importReport.programsImported.length} program
+          {importReport.programsImported.length === 1 ? "" : "s"}
+          {" · "}+{importReport.liftsAdded} new lift
+          {importReport.liftsAdded === 1 ? "" : "s"} ({importReport.liftsReused} reused
+          {importReport.liftConflicts.length > 0
+            ? `, ${importReport.liftConflicts.length} name conflict${importReport.liftConflicts.length === 1 ? "" : "s"}`
+            : ""}
+          ).
+        </p>
+      ) : null}
 
       <section className="dashboard-card">
         <div className="toolbar">

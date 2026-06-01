@@ -8,6 +8,7 @@ const {
 } = require("../utils/programLibrary");
 const { resolveProgramVariant, standardProgramVariant } = require("../utils/programVariant");
 const { recordAudit } = require("../utils/audit");
+const { applyCsvToLibrary } = require("../utils/csvImporter");
 
 const router = express.Router();
 const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"]);
@@ -33,48 +34,68 @@ function createUniqueId(baseId, existingIds) {
   return `${baseId}-${suffix}`;
 }
 
-function normalizeExercisePayload(body) {
+function normalizeExercisePayload(body, { strict = true } = {}) {
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const category = typeof body?.category === "string" ? body.category.trim() : "";
   const defaultWeight = typeof body?.defaultWeight === "string" ? body.defaultWeight.trim() : "";
   const defaultNotes = typeof body?.defaultNotes === "string" ? body.defaultNotes.trim() : "";
-  const defaultSets = Number(body?.defaultSets);
-  const defaultReps = Number(body?.defaultReps);
+  const defaultSetsRaw = Number(body?.defaultSets);
+  const defaultRepsRaw = Number(body?.defaultReps);
 
   if (!name) {
     return { error: "Exercise name is required." };
   }
 
-  if (!category) {
-    return { error: "Category is required." };
+  if (strict) {
+    if (!category) {
+      return { error: "Category is required." };
+    }
+    if (!Number.isFinite(defaultSetsRaw) || defaultSetsRaw < 1) {
+      return { error: "Default sets must be at least 1." };
+    }
+    if (!Number.isFinite(defaultRepsRaw) || defaultRepsRaw < 1) {
+      return { error: "Default reps must be at least 1." };
+    }
+    if (!defaultWeight) {
+      return { error: "Default weight is required." };
+    }
   }
 
-  if (!Number.isFinite(defaultSets) || defaultSets < 1) {
-    return { error: "Default sets must be at least 1." };
-  }
-
-  if (!Number.isFinite(defaultReps) || defaultReps < 1) {
-    return { error: "Default reps must be at least 1." };
-  }
-
-  if (!defaultWeight) {
-    return { error: "Default weight is required." };
-  }
+  // Inline newLift bodies (strict=false) come from in-progress program
+  // rows. Coerce missing fields to safe defaults so a half-typed row
+  // can still create a library entry and persist.
+  const defaultSets = Number.isFinite(defaultSetsRaw) && defaultSetsRaw >= 1 ? defaultSetsRaw : 1;
+  const defaultReps = Number.isFinite(defaultRepsRaw) && defaultRepsRaw >= 1 ? defaultRepsRaw : 1;
 
   return {
     value: {
       name,
-      category,
+      category: category || "Custom",
       defaultSets,
       defaultReps,
-      defaultWeight,
+      defaultWeight: defaultWeight || "Bodyweight",
       defaultNotes
     }
   };
 }
 
+// A row is "truly empty" when there's no library reference, no inline
+// newLift name, and no typed exercise name. These are UI scaffolding
+// (e.g. the user added a row, didn't fill it in) and get dropped
+// silently — they can't be persisted (the library validator requires a
+// real liftId) and nuking them is not destructive because there's
+// nothing the coach typed to lose.
+function isEmptyLiftRow(lift) {
+  const liftId = typeof lift?.liftId === "string" ? lift.liftId.trim() : "";
+  const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
+  const newLiftName = typeof lift?.newLift?.name === "string" ? lift.newLift.name.trim() : "";
+  return !liftId && !exerciseName && !newLiftName;
+}
+
 // Resolve every day-lift entry in a program payload. Each entry either
 // references an existing liftId or carries a `newLift: {...}` object.
+// Truly-empty rows (no liftId, no newLift name, no exerciseName) are
+// dropped here so a half-built draft row never blocks the save.
 // Returns { nextLifts, resolvedDays } where nextLifts is the library's
 // liftLibrary with any newly-created lifts appended (and deduped by
 // slug across the same submission).
@@ -85,7 +106,10 @@ function resolveProgramLifts({ days, liftLibrary }) {
   const nextLifts = liftLibrary.slice();
 
   function resolveNewLift(payload, dayIndex, liftIndex) {
-    const normalized = normalizeExercisePayload(payload);
+    // Lenient mode: inline newLift entries come from in-progress
+    // program rows. The library entry can be created with safe
+    // defaults even if the coach hasn't typed sets/reps/weight yet.
+    const normalized = normalizeExercisePayload(payload, { strict: false });
     if (normalized.error) {
       const err = new Error(
         `Day ${dayIndex + 1}, exercise ${liftIndex + 1}: ${normalized.error}`
@@ -111,9 +135,11 @@ function resolveProgramLifts({ days, liftLibrary }) {
     return id;
   }
 
-  const resolvedDays = days.map((day, dayIndex) => ({
-    ...day,
-    lifts: day.lifts.map((lift, liftIndex) => {
+  const resolvedDays = days.map((day, dayIndex) => {
+    const inputLifts = Array.isArray(day.lifts) ? day.lifts : [];
+    const kept = [];
+    inputLifts.forEach((lift, liftIndex) => {
+      if (isEmptyLiftRow(lift)) return;
       let liftId = typeof lift?.liftId === "string" ? lift.liftId.trim() : "";
       if (liftId && !liftsById.has(liftId)) {
         liftId = "";
@@ -121,16 +147,34 @@ function resolveProgramLifts({ days, liftLibrary }) {
       if (!liftId && lift?.newLift) {
         liftId = resolveNewLift(lift.newLift, dayIndex, liftIndex);
       }
-      if (!liftId) {
-        const err = new Error(
-          `Day ${dayIndex + 1}, exercise ${liftIndex + 1}: pick a library exercise or fill in a new one.`
-        );
-        err.status = 400;
-        throw err;
+      // The exerciseName may resolve to an existing library entry even
+      // if the client didn't attach a newLift (defensive — current
+      // client always attaches one). Try a slug lookup as a last step.
+      if (!liftId && typeof lift?.exerciseName === "string" && lift.exerciseName.trim()) {
+        const slug = slugify(lift.exerciseName);
+        const existing = liftsBySlug.get(slug);
+        if (existing) {
+          liftId = existing.id;
+        } else {
+          liftId = resolveNewLift(
+            {
+              name: lift.exerciseName,
+              category: "Custom",
+              defaultSets: lift.sets,
+              defaultReps: lift.reps,
+              defaultWeight: lift.weight,
+              defaultNotes: lift.notes
+            },
+            dayIndex,
+            liftIndex
+          );
+        }
       }
-      return { ...lift, liftId };
-    })
-  }));
+      if (!liftId) return; // shouldn't happen post-isEmptyLiftRow, but skip rather than throw
+      kept.push({ ...lift, liftId });
+    });
+    return { ...day, lifts: kept };
+  });
 
   return { nextLifts, resolvedDays };
 }
@@ -186,26 +230,20 @@ function normalizeProgramPayload(body, liftLibrary) {
 
     return {
       dayOffset,
-      lifts: lifts.map((lift, liftIndex) => {
+      // Per-lift fields are coerced rather than rejected. The previous
+      // throws on missing sets/reps/weight masqueraded as "the row I
+      // edited disappeared" because they killed the autosave PUT and
+      // the modal reloaded from disk on close. Drafts persist now.
+      lifts: lifts.map((lift) => {
         const liftId = lift.liftId;
         const blockLabel = typeof lift?.blockLabel === "string" ? lift.blockLabel.trim() : "";
         const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
         const weight = typeof lift?.weight === "string" ? lift.weight.trim() : "";
         const notes = typeof lift?.notes === "string" ? lift.notes.trim() : "";
-        const sets = Number(lift?.sets);
-        const reps = Number(lift?.reps);
-
-        if (!Number.isFinite(sets) || sets < 1) {
-          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs valid sets.`);
-        }
-
-        if (!Number.isFinite(reps) || reps < 1) {
-          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs valid reps.`);
-        }
-
-        if (!weight) {
-          throw new Error(`Day ${dayIndex + 1}, exercise ${liftIndex + 1} needs a weight value.`);
-        }
+        const setsRaw = Number(lift?.sets);
+        const repsRaw = Number(lift?.reps);
+        const sets = Number.isFinite(setsRaw) && setsRaw >= 1 ? setsRaw : 1;
+        const reps = Number.isFinite(repsRaw) && repsRaw >= 1 ? repsRaw : 1;
 
         return { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
       })
@@ -232,6 +270,69 @@ router.get("/", async (_req, res, next) => {
   try {
     const library = await readProgramLibrary();
     return res.json(libraryResponse(library));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Import programs from a structured CSV string. Body shape:
+// { content: "<full CSV text>" }. Uses the same parse + merge logic
+// the CLI importer uses, so behavior is identical between the two
+// surfaces. Idempotent on program_id: re-uploading the same CSV
+// updates programs in place rather than duplicating them.
+router.post("/csv-import", async (req, res, next) => {
+  try {
+    const content = typeof req.body?.content === "string" ? req.body.content : "";
+    if (!content.trim()) {
+      return res.status(400).json({ error: "CSV content is required." });
+    }
+
+    const library = await readProgramLibrary();
+    const beforeLiftCount = library.liftLibrary.length;
+
+    let result;
+    try {
+      result = applyCsvToLibrary(library, content);
+    } catch (parseError) {
+      return res.status(400).json({ error: parseError.message });
+    }
+
+    try {
+      assertValidLibrary(library);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    await writeProgramLibrary(library);
+
+    await recordAudit({
+      req,
+      action: "program_library.update",
+      targetType: "program_library",
+      targetLabel: "csv-import",
+      metadata: {
+        programsImported: result.programs.length,
+        liftsAdded: result.liftReport.added,
+        liftsReused: result.liftReport.reused,
+        liftConflicts: result.liftReport.conflicts.length
+      }
+    });
+
+    return res.status(200).json({
+      ...libraryResponse(library),
+      importReport: {
+        programsImported: result.programs.map((p) => ({
+          id: p.id,
+          name: p.name,
+          phase: p.phase,
+          frequency: p.frequency
+        })),
+        liftsAdded: result.liftReport.added,
+        liftsReused: result.liftReport.reused,
+        liftConflicts: result.liftReport.conflicts,
+        liftLibraryDelta: library.liftLibrary.length - beforeLiftCount
+      }
+    });
   } catch (error) {
     return next(error);
   }
@@ -505,24 +606,16 @@ function normalizeMiscPayload(body, liftLibrary) {
     return { error: error.message };
   }
 
-  const normalizedLifts = resolution.resolvedDays[0].lifts.map((lift, liftIndex) => {
+  const normalizedLifts = resolution.resolvedDays[0].lifts.map((lift) => {
     const liftId = lift.liftId;
     const blockLabel = typeof lift?.blockLabel === "string" ? lift.blockLabel.trim() : "";
     const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
     const weight = typeof lift?.weight === "string" ? lift.weight.trim() : "";
     const notes = typeof lift?.notes === "string" ? lift.notes.trim() : "";
-    const sets = Number(lift?.sets);
-    const reps = Number(lift?.reps);
-
-    if (!Number.isFinite(sets) || sets < 1) {
-      throw new Error(`Lift ${liftIndex + 1} needs valid sets.`);
-    }
-    if (!Number.isFinite(reps) || reps < 1) {
-      throw new Error(`Lift ${liftIndex + 1} needs valid reps.`);
-    }
-    if (!weight) {
-      throw new Error(`Lift ${liftIndex + 1} needs a weight value.`);
-    }
+    const setsRaw = Number(lift?.sets);
+    const repsRaw = Number(lift?.reps);
+    const sets = Number.isFinite(setsRaw) && setsRaw >= 1 ? setsRaw : 1;
+    const reps = Number.isFinite(repsRaw) && repsRaw >= 1 ? repsRaw : 1;
     return { liftId, blockLabel, exerciseName, sets, reps, weight, notes };
   });
 

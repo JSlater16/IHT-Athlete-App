@@ -76,7 +76,20 @@ async function fetchTrials(testId, tenantId) {
   return Array.isArray(data) ? data : [];
 }
 
+// VALD's /tests payload labels body weight differently across regions
+// and API versions — try the common keys and store the first finite
+// number found. Stored in kg; the client converts to lb at display.
+function extractBodyMassKg(test) {
+  const candidates = [test?.weight, test?.bodyMass, test?.weightKg, test?.bodyWeight];
+  for (const raw of candidates) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
 async function upsertTest({ athleteId, test, metrics }) {
+  const bodyMass = extractBodyMassKg(test);
   return prisma.$transaction(async (tx) => {
     const existing = await tx.forceDecksTest.findUnique({
       where: { externalId: test.testId }
@@ -84,6 +97,7 @@ async function upsertTest({ athleteId, test, metrics }) {
     const baseData = {
       athleteId,
       testDate: new Date(test.recordedDateUtc),
+      bodyMass,
       source: "vald"
     };
     if (existing) {

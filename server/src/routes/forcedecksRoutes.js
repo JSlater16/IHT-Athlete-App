@@ -28,12 +28,12 @@ function parseLimit(value) {
   return Math.min(Math.floor(parsed), MAX_LIMIT);
 }
 
-function serializeTest(test) {
+function serializeTest(test, { includeBodyMass = false } = {}) {
   const metrics = {};
   for (const m of test.metrics || []) {
     metrics[m.metricName] = { value: m.value, unit: m.unit };
   }
-  return {
+  const out = {
     id: test.id,
     testDate: test.testDate,
     readinessScore: test.readinessScore,
@@ -42,9 +42,13 @@ function serializeTest(test) {
     externalId: test.externalId,
     metrics
   };
+  // bodyMass is coach-only. The athlete-facing /me endpoint must
+  // never include it; explicit opt-in here is the gate.
+  if (includeBodyMass) out.bodyMass = test.bodyMass ?? null;
+  return out;
 }
 
-async function loadAthleteDashboard(athleteId, limit) {
+async function loadAthleteDashboard(athleteId, limit, { includeBodyMass = false } = {}) {
   // Newest tests first; UI consumes them in order.
   const tests = await prisma.forceDecksTest.findMany({
     where: { athleteId },
@@ -83,12 +87,28 @@ async function loadAthleteDashboard(athleteId, limit) {
     }
   }
 
-  return {
-    tests: tests.map(serializeTest),
+  const payload = {
+    tests: tests.map((t) => serializeTest(t, { includeBodyMass })),
     bests,
     firsts,
     metricCatalog: METRICS
   };
+
+  if (includeBodyMass) {
+    // Coach view also gets the latest non-null body weight across all
+    // tests (not just the limit window), so a missing reading on the
+    // most recent test doesn't blank the stat chip.
+    const latestWithMass = await prisma.forceDecksTest.findFirst({
+      where: { athleteId, bodyMass: { not: null } },
+      orderBy: { testDate: "desc" },
+      select: { bodyMass: true, testDate: true }
+    });
+    payload.latestBodyMass = latestWithMass
+      ? { value: latestWithMass.bodyMass, testDate: latestWithMass.testDate }
+      : null;
+  }
+
+  return payload;
 }
 
 // GET /api/forcedecks/leaderboard — ranked all-time PR per athlete on
@@ -209,10 +229,27 @@ router.get("/roster", requireCoach, async (req, res, next) => {
         forcedecksTests: {
           orderBy: { testDate: "desc" },
           take: 2,
-          select: { testDate: true, readinessScore: true }
+          select: { testDate: true, readinessScore: true, bodyMass: true }
         }
       }
     });
+
+    // Coach-only latest body weight per athlete. Separate query so we
+    // don't miss it when the most recent test happens to lack a body
+    // mass reading (historical, pre-bodyMass-wiring tests).
+    const activeIds = athletes.filter((a) => a.user?.isActive !== false).map((a) => a.id);
+    const latestMassRows = await Promise.all(
+      activeIds.map((id) =>
+        prisma.forceDecksTest.findFirst({
+          where: { athleteId: id, bodyMass: { not: null } },
+          orderBy: { testDate: "desc" },
+          select: { athleteId: true, bodyMass: true, testDate: true }
+        })
+      )
+    );
+    const latestMassByAthlete = new Map(
+      latestMassRows.filter(Boolean).map((r) => [r.athleteId, r])
+    );
 
     const rows = athletes
       .filter((a) => a.user?.isActive !== false)
@@ -223,6 +260,7 @@ router.get("/roster", requireCoach, async (req, res, next) => {
             ? latest.readinessScore - previous.readinessScore
             : null;
         const flagged = delta !== null && delta < -10;
+        const latestMass = latestMassByAthlete.get(a.id) || null;
         return {
           athleteId: a.id,
           name: a.user.name,
@@ -232,7 +270,10 @@ router.get("/roster", requireCoach, async (req, res, next) => {
             ? { testDate: previous.testDate, readinessScore: previous.readinessScore }
             : null,
           delta,
-          flagged
+          flagged,
+          latestBodyMass: latestMass
+            ? { value: latestMass.bodyMass, testDate: latestMass.testDate }
+            : null
         };
       })
       .sort((a, b) => {
@@ -433,7 +474,7 @@ router.get("/athletes/:athleteId", requireCoach, async (req, res, next) => {
       return res.status(404).json({ error: "Athlete not found" });
     }
     const limit = parseLimit(req.query.limit);
-    const payload = await loadAthleteDashboard(profile.id, limit);
+    const payload = await loadAthleteDashboard(profile.id, limit, { includeBodyMass: true });
     return res.json({ athleteId: profile.id, name: profile.user.name, ...payload });
   } catch (error) {
     return next(error);

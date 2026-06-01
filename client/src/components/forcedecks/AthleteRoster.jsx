@@ -15,6 +15,17 @@ function deltaLabel(delta) {
   return `${sign}${Math.abs(delta)}`;
 }
 
+function kgToLb(kg) {
+  if (kg == null || !Number.isFinite(Number(kg))) return null;
+  return Number(kg) * 2.20462;
+}
+
+function weightLabel(latestBodyMass) {
+  const lb = kgToLb(latestBodyMass?.value);
+  if (lb == null) return "—";
+  return `${Math.round(lb)} lb`;
+}
+
 export default function AthleteRoster() {
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -80,6 +91,7 @@ export default function AthleteRoster() {
                 <th>Latest test</th>
                 <th>Readiness</th>
                 <th>Δ vs previous</th>
+                <th>Weight</th>
                 <th aria-label="Flag" />
               </tr>
             </thead>
@@ -106,6 +118,7 @@ export default function AthleteRoster() {
                   <td className={`fd-roster-delta ${a.delta != null && a.delta < 0 ? "is-down" : ""}`}>
                     {deltaLabel(a.delta)}
                   </td>
+                  <td className="fd-roster-weight">{weightLabel(a.latestBodyMass)}</td>
                   <td>{a.flagged ? <span className="fd-flag-dot" aria-label="Flagged" /> : null}</td>
                 </tr>
               ))}

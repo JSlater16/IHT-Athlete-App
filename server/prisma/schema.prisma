@@ -100,6 +100,10 @@ model ForceDecksTest {
   testDate         DateTime
   readinessScore   Int?
   readinessDetails Json?
+  // Body weight (kg) recorded with the test by VALD. Coach-only field
+  // — never returned to athlete-facing endpoints. Null for historical
+  // tests synced before the field was wired up.
+  bodyMass         Float?
   source           String             @default("vald")
   externalId       String?            @unique
   createdAt        DateTime           @default(now())
