@@ -576,10 +576,20 @@ router.put("/:id/lifts/:liftId", async (req, res, next) => {
       return res.status(400).json({ error: validated.error });
     }
 
+    // Intentionally preserve the existing date instant. The client
+    // round-trips a "YYYY-MM-DD" formatted from lift.date, which the
+    // server re-parses to a fresh DateTime (parseDateInput stamps it
+    // at noon UTC). If the original lift was stored at a different
+    // instant within the same calendar day, that re-stamp shifts it
+    // past sibling rows in the [date asc, orderIndex asc] sort and
+    // the row appears to "jump to the bottom" of its day. Editing a
+    // lift should never reorder it; move/reorder is a separate route.
+    const { date: _validatedDate, ...updateData } = validated.value;
+
     const lift = await prisma.lift.update({
       where: { id: existingLift.id },
       data: {
-        ...validated.value,
+        ...updateData,
         completed:
           typeof req.body?.completed === "boolean" ? req.body.completed : existingLift.completed
       }
