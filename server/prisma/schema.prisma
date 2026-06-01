@@ -29,23 +29,23 @@ model User {
 }
 
 model AthleteProfile {
-  id                      String           @id @default(cuid())
-  userId                  String           @unique
-  phase                   String
-  phaseStartedAt          DateTime         @default(now())
-  coachNotes              String           @default("")
-  rehabProfile            String           @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
-  programmingDays         Int              @default(3)
-  trainingModel           String           @default("10-Week")
-  programVariant          String           @default("Standard")
-  hideFromLeaderboard     Boolean          @default(false)
-  valdProfileId           String?          @unique
-  valdLastSyncedAt        DateTime?
-  updatedAt               DateTime         @updatedAt
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lifts           Lift[]
-  rehabNotes      RehabNote[]
-  forcedecksTests ForceDecksTest[]
+  id                  String           @id @default(cuid())
+  userId              String           @unique
+  phase               String
+  phaseStartedAt      DateTime         @default(now())
+  coachNotes          String           @default("")
+  rehabProfile        String           @default("{\"inhibitedMuscles\":[],\"padPlacementImages\":[]}")
+  programmingDays     Int              @default(3)
+  trainingModel       String           @default("10-Week")
+  programVariant      String           @default("Standard")
+  hideFromLeaderboard Boolean          @default(false)
+  valdProfileId       String?          @unique
+  valdLastSyncedAt    DateTime?
+  updatedAt           DateTime         @updatedAt
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifts               Lift[]
+  rehabNotes          RehabNote[]
+  forcedecksTests     ForceDecksTest[]
 }
 
 model Lift {
@@ -95,22 +95,28 @@ model RehabNote {
 // carries the full breakdown (raw, confidence, status, baselines,
 // deltas) for trend analysis.
 model ForceDecksTest {
-  id               String             @id @default(cuid())
-  athleteId        String
-  testDate         DateTime
-  readinessScore   Int?
-  readinessDetails Json?
+  id                String             @id @default(cuid())
+  athleteId         String
+  testDate          DateTime
+  readinessScore    Int?
+  readinessDetails  Json?
   // Body weight (kg) recorded with the test by VALD. Coach-only field
   // — never returned to athlete-facing endpoints. Null for historical
   // tests synced before the field was wired up.
-  bodyMass         Float?
-  source           String             @default("vald")
-  externalId       String?            @unique
-  createdAt        DateTime           @default(now())
-  athlete          AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  metrics          ForceDecksMetric[]
+  bodyMass          Float?
+  source            String             @default("vald")
+  externalId        String?            @unique
+  // Non-null when one of the four readiness metrics landed
+  // missing/non-positive on ingest and we're waiting on VALD's async
+  // analytics to finish. Cleared once all four are present.
+  metricsRetryAt    DateTime?
+  metricsRetryCount Int                @default(0)
+  createdAt         DateTime           @default(now())
+  athlete           AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  metrics           ForceDecksMetric[]
 
   @@index([athleteId, testDate])
+  @@index([metricsRetryAt])
 }
 
 model ForceDecksMetric {

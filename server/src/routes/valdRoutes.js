@@ -87,13 +87,17 @@ router.post("/sync/:athleteId", async (req, res, next) => {
 });
 
 // POST /api/vald/sync — sync every athlete linked to a VALD profile.
-// Owner only; used as the cron handler too.
+// Owner only; used as the cron handler too. Pass { fullHistory: true }
+// in the body to re-pull each athlete's last 365 days (overwriting
+// stored metric rows) — same behavior as the per-athlete manual sync,
+// fan-out across the roster.
 router.post("/sync", async (req, res, next) => {
   try {
     if (req.user?.role !== "OWNER") {
       return res.status(403).json({ error: "Owner access required." });
     }
-    const results = await syncAllLinkedAthletes();
+    const fullHistory = req.body?.fullHistory === true;
+    const results = await syncAllLinkedAthletes({ fullHistory });
     const imported = results.reduce((acc, r) => acc + (r.imported || 0), 0);
     const errors = results.filter((r) => r.error).length;
     await recordAudit({
@@ -102,9 +106,9 @@ router.post("/sync", async (req, res, next) => {
       targetType: "vald",
       targetId: null,
       targetLabel: "",
-      metadata: { athletesSynced: results.length, imported, errors }
+      metadata: { athletesSynced: results.length, imported, errors, fullHistory }
     });
-    return res.json({ results, imported, errors });
+    return res.json({ results, imported, errors, fullHistory });
   } catch (error) {
     return next(error);
   }

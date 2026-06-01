@@ -16,6 +16,33 @@ const SUPPORTED_TEST_TYPE = "CMJ";
 // the first sync.
 const INITIAL_LOOKBACK_DAYS = 365;
 
+// Readiness inputs. Mirrors WEIGHTS in utils/readiness.js — kept inline
+// to avoid a circular require with readinessApply. Update both if the
+// equation ever changes.
+const READINESS_REQUIRED_KEYS = [
+  "force_at_zero_velocity",
+  "eccentric_peak_velocity",
+  "concentric_impulse_at_100ms",
+  "concentric_rfd"
+];
+
+// Stagger retries to catch VALD's async pipeline whether it finishes in
+// minutes or hours. Index = retries already attempted; value = delay
+// before the next attempt. After three failed retries we give up.
+const RETRY_SCHEDULE_MS = [
+  30 * 60 * 1000,
+  6 * 60 * 60 * 1000,
+  24 * 60 * 60 * 1000
+];
+
+function missingReadinessKeys(metrics) {
+  const present = new Map(metrics.map((m) => [m.metricName, m.value]));
+  return READINESS_REQUIRED_KEYS.filter((k) => {
+    const v = present.get(k);
+    return !(typeof v === "number" && v > 0);
+  });
+}
+
 function appKeyToUnit(appKey) {
   return METRICS.find((m) => m.key === appKey)?.unit || "";
 }
@@ -90,6 +117,14 @@ function extractBodyMassKg(test) {
 
 async function upsertTest({ athleteId, test, metrics }) {
   const bodyMass = extractBodyMassKg(test);
+  // Initial retry state. Every (re)ingest resets the counter — if a
+  // manual full-history sync still finds the metric missing, we start
+  // the retry clock fresh from 30 min.
+  const missing = missingReadinessKeys(metrics);
+  const retryState = missing.length > 0
+    ? { metricsRetryAt: new Date(Date.now() + RETRY_SCHEDULE_MS[0]), metricsRetryCount: 0 }
+    : { metricsRetryAt: null, metricsRetryCount: 0 };
+
   return prisma.$transaction(async (tx) => {
     const existing = await tx.forceDecksTest.findUnique({
       where: { externalId: test.testId }
@@ -98,7 +133,8 @@ async function upsertTest({ athleteId, test, metrics }) {
       athleteId,
       testDate: new Date(test.recordedDateUtc),
       bodyMass,
-      source: "vald"
+      source: "vald",
+      ...retryState
     };
     if (existing) {
       await tx.forceDecksMetric.deleteMany({ where: { testId: existing.id } });
@@ -206,7 +242,16 @@ async function syncAthleteForceDecks(athleteId, { fullHistory = false } = {}) {
   };
 }
 
-async function syncAllLinkedAthletes() {
+async function syncAllLinkedAthletes({ fullHistory = false } = {}) {
+  // Process any retries that came due before pulling new tests — that
+  // way the nightly cron picks up everything in one pass even if the
+  // 15-min in-process tick missed a window (e.g. server was restarting).
+  try {
+    await retryPendingMetricFetches();
+  } catch (err) {
+    console.error("[vald-retry] nightly retry pass failed:", err.message);
+  }
+
   const athletes = await prisma.athleteProfile.findMany({
     where: {
       valdProfileId: { not: null },
@@ -218,7 +263,7 @@ async function syncAllLinkedAthletes() {
   const results = [];
   for (const a of athletes) {
     try {
-      results.push(await syncAthleteForceDecks(a.id));
+      results.push(await syncAthleteForceDecks(a.id, { fullHistory }));
     } catch (err) {
       results.push({ athleteId: a.id, error: err.message });
     }
@@ -226,4 +271,93 @@ async function syncAllLinkedAthletes() {
   return results;
 }
 
-module.exports = { syncAthleteForceDecks, syncAllLinkedAthletes };
+// Re-fetch trials for any test whose readiness inputs landed incomplete
+// and whose retry slot has come due. Replaces metric rows wholesale,
+// recomputes readiness, then either clears the retry flag (all four
+// metrics now positive) or escalates to the next slot. After three
+// failed attempts we stop trying.
+async function retryPendingMetricFetches({ logger = console } = {}) {
+  if (process.env.VALD_CRON_DISABLED === "true") return { processed: 0 };
+  if (!process.env.VALD_CLIENT_ID || !process.env.VALD_CLIENT_SECRET) {
+    return { processed: 0 };
+  }
+
+  let config;
+  try {
+    config = getValdConfig();
+    assertValdCredentials(config);
+    assertValdTenant(config);
+  } catch {
+    return { processed: 0 };
+  }
+
+  const pending = await prisma.forceDecksTest.findMany({
+    where: {
+      metricsRetryAt: { not: null, lte: new Date() },
+      externalId: { not: null }
+    },
+    select: { id: true, externalId: true, metricsRetryCount: true }
+  });
+
+  if (pending.length === 0) return { processed: 0 };
+
+  let resolved = 0;
+  let escalated = 0;
+  let givenUp = 0;
+
+  for (const t of pending) {
+    try {
+      const trials = await fetchTrials(t.externalId, config.tenantId);
+      const newMetrics = trials.length > 0 ? extractMetricsAcrossTrials(trials) : [];
+
+      await prisma.$transaction(async (tx) => {
+        await tx.forceDecksMetric.deleteMany({ where: { testId: t.id } });
+        if (newMetrics.length > 0) {
+          await tx.forceDecksTest.update({
+            where: { id: t.id },
+            data: { metrics: { create: newMetrics } }
+          });
+        }
+      });
+
+      const missing = missingReadinessKeys(newMetrics);
+      if (missing.length === 0) {
+        await prisma.forceDecksTest.update({
+          where: { id: t.id },
+          data: { metricsRetryAt: null, metricsRetryCount: 0 }
+        });
+        await computeAndApplyReadiness(t.id);
+        resolved += 1;
+      } else {
+        const newCount = (t.metricsRetryCount || 0) + 1;
+        const nextDelay = RETRY_SCHEDULE_MS[newCount];
+        const nextAt = nextDelay == null ? null : new Date(Date.now() + nextDelay);
+        await prisma.forceDecksTest.update({
+          where: { id: t.id },
+          data: { metricsRetryAt: nextAt, metricsRetryCount: newCount }
+        });
+        // Recompute readiness anyway — the replacement may have updated
+        // other metrics, and the stored readinessDetails should reflect
+        // the current state.
+        await computeAndApplyReadiness(t.id);
+        if (nextAt == null) givenUp += 1;
+        else escalated += 1;
+      }
+    } catch (err) {
+      // Transient fetch errors: leave the retry slot in place so we try
+      // again on the next tick. Don't escalate the count.
+      logger.error(`[vald-retry] test ${t.id} fetch failed: ${err.message}`);
+    }
+  }
+
+  logger.log(
+    `[vald-retry] processed ${pending.length}: resolved=${resolved} escalated=${escalated} givenUp=${givenUp}`
+  );
+  return { processed: pending.length, resolved, escalated, givenUp };
+}
+
+module.exports = {
+  syncAthleteForceDecks,
+  syncAllLinkedAthletes,
+  retryPendingMetricFetches
+};

@@ -27,10 +27,13 @@ function weightLabel(latestBodyMass) {
 }
 
 export default function AthleteRoster() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const [state, setState] = useState({ status: "loading", athletes: [], error: null });
   const [query, setQuery] = useState("");
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncResult, setResyncResult] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -43,7 +46,36 @@ export default function AthleteRoster() {
         setState({ status: "error", athletes: [], error: err.message || "Failed to load" });
       });
     return () => ctrl.abort();
-  }, [token]);
+  }, [token, refreshKey]);
+
+  async function handleResyncAll() {
+    if (resyncing) return;
+    if (!window.confirm("Re-pull the last 365 days from VALD for every linked athlete? This can take a few minutes.")) {
+      return;
+    }
+    setResyncing(true);
+    setResyncResult("");
+    try {
+      const result = await apiRequest("/api/vald/sync", {
+        method: "POST",
+        token,
+        body: { fullHistory: true }
+      });
+      const athletesSynced = Array.isArray(result?.results) ? result.results.length : 0;
+      const imported = result?.imported ?? 0;
+      const errors = result?.errors ?? 0;
+      setResyncResult(
+        `Synced ${athletesSynced} athlete${athletesSynced === 1 ? "" : "s"}, ` +
+          `imported ${imported} test${imported === 1 ? "" : "s"}` +
+          (errors ? `, ${errors} failed.` : ".")
+      );
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setResyncResult(err.message || "Re-sync failed.");
+    } finally {
+      setResyncing(false);
+    }
+  }
 
   const filteredAthletes = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -61,7 +93,20 @@ export default function AthleteRoster() {
               Latest readiness across every active athlete. Flagged rows dropped &gt; 10 points
               since their previous test.
             </p>
+            {resyncResult ? <p className="fd-sync-result">{resyncResult}</p> : null}
           </div>
+          {user?.role === "OWNER" ? (
+            <div className="fd-page-actions">
+              <button
+                type="button"
+                className="fd-report-button"
+                onClick={handleResyncAll}
+                disabled={resyncing}
+              >
+                {resyncing ? "Re-syncing…" : "Re-sync all from VALD"}
+              </button>
+            </div>
+          ) : null}
         </header>
 
         {state.status === "ready" && state.athletes.length > 0 ? (
