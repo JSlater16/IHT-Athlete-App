@@ -1,7 +1,16 @@
 const app = require("./app");
 const { startValdCron } = require("./vald/cron");
-const { startOnezeroCron } = require("./onezero/cron");
 const { retryPendingMetricFetches } = require("./vald/sync");
+
+// 1080 Motion ("onezero") integration is being iterated locally and
+// hasn't been committed yet. Load its cron starter if present so local
+// dev works, but don't blow up the deploy when the module isn't there.
+let startOnezeroCron = null;
+try {
+  startOnezeroCron = require("./onezero/cron").startOnezeroCron;
+} catch (err) {
+  if (err?.code !== "MODULE_NOT_FOUND") throw err;
+}
 
 const port = Number(process.env.PORT) || 4000;
 const host = process.env.HOST || "127.0.0.1";
@@ -15,7 +24,7 @@ const RETRY_TICK_MS = 15 * 60 * 1000;
 const server = app.listen(port, host, () => {
   console.log(`API listening on http://${host}:${port}`);
   startValdCron();
-  startOnezeroCron();
+  if (startOnezeroCron) startOnezeroCron();
 
   if (process.env.VALD_RETRY_TICK_DISABLED !== "true") {
     setInterval(() => {
