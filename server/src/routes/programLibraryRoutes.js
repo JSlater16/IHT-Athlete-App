@@ -79,102 +79,125 @@ function normalizeExercisePayload(body, { strict = true } = {}) {
   };
 }
 
-// A row is "truly empty" when there's no library reference, no inline
-// newLift name, and no typed exercise name. These are UI scaffolding
-// (e.g. the user added a row, didn't fill it in) and get dropped
-// silently — they can't be persisted (the library validator requires a
-// real liftId) and nuking them is not destructive because there's
-// nothing the coach typed to lose.
-function isEmptyLiftRow(lift) {
+// Drop only rows where the user has clearly typed nothing: no library
+// reference, no typed name, no inline newLift name. A row with a
+// liftId always survives — that's the load-from-storage state for
+// every existing program (storage shape is {liftId, sets, reps,
+// weight}, no exerciseName), and dropping any such row is the bug we
+// are explicitly trying to stop.
+function rowHasContent(lift) {
   const liftId = typeof lift?.liftId === "string" ? lift.liftId.trim() : "";
   const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
   const newLiftName = typeof lift?.newLift?.name === "string" ? lift.newLift.name.trim() : "";
-  return !liftId && !exerciseName && !newLiftName;
+  return Boolean(liftId || exerciseName || newLiftName);
 }
 
-// Resolve every day-lift entry in a program payload. Each entry either
-// references an existing liftId or carries a `newLift: {...}` object.
-// Truly-empty rows (no liftId, no newLift name, no exerciseName) are
-// dropped here so a half-built draft row never blocks the save.
-// Returns { nextLifts, resolvedDays } where nextLifts is the library's
-// liftLibrary with any newly-created lifts appended (and deduped by
-// slug across the same submission).
+// Resolve every day-lift entry in a program payload. Every row that
+// has *any* content survives — if a row's liftId is stale and no name
+// is provided, we mint a placeholder library entry rather than
+// silently dropping the row. The previous "drop on unresolved" path
+// is what was making the coach's edits disappear: legacy programs
+// stored only {liftId, sets, reps, weight} (no exerciseName), and on
+// any case-mismatch or transient library state the row would be lost
+// with no error surfaced.
 function resolveProgramLifts({ days, liftLibrary }) {
   const liftsById = new Map(liftLibrary.map((lift) => [lift.id, lift]));
   const liftsBySlug = new Map(liftLibrary.map((lift) => [slugify(lift.name), lift]));
   const existingIds = new Set(liftLibrary.map((lift) => lift.id));
   const nextLifts = liftLibrary.slice();
 
-  function resolveNewLift(payload, dayIndex, liftIndex) {
-    // Lenient mode: inline newLift entries come from in-progress
-    // program rows. The library entry can be created with safe
-    // defaults even if the coach hasn't typed sets/reps/weight yet.
-    const normalized = normalizeExercisePayload(payload, { strict: false });
-    if (normalized.error) {
-      const err = new Error(
-        `Day ${dayIndex + 1}, exercise ${liftIndex + 1}: ${normalized.error}`
-      );
-      err.status = 400;
-      throw err;
-    }
-
-    // Dedup by slug — two inline new-lifts with the same name in the
-    // same save become one library entry, referenced twice.
-    const slug = slugify(normalized.value.name);
+  function ensureLibraryEntry({ id, name, category, sets, reps, weight, notes }) {
+    // Returns a valid liftId, creating a library entry if needed.
+    if (id && liftsById.has(id)) return id;
+    const safeName = (name && name.trim()) || (id && id.trim()) || "Untitled exercise";
+    const slug = slugify(safeName) || slugify(id || "") || "exercise";
     const existing = liftsBySlug.get(slug);
-    if (existing) {
-      return existing.id;
-    }
-
-    const id = createUniqueId(slug || "exercise", existingIds);
-    existingIds.add(id);
-    const created = { id, ...normalized.value };
+    if (existing) return existing.id;
+    const newId = createUniqueId(id && !existingIds.has(id) ? id : slug, existingIds);
+    existingIds.add(newId);
+    const safeSets = Number.isFinite(Number(sets)) && Number(sets) >= 1 ? Number(sets) : 1;
+    const safeReps = Number.isFinite(Number(reps)) && Number(reps) >= 1 ? Number(reps) : 1;
+    const created = {
+      id: newId,
+      name: safeName,
+      category: (category && category.trim()) || "Custom",
+      defaultSets: safeSets,
+      defaultReps: safeReps,
+      defaultWeight: (weight && weight.trim()) || "Bodyweight",
+      defaultNotes: (notes && notes.trim()) || ""
+    };
     nextLifts.push(created);
-    liftsById.set(id, created);
+    liftsById.set(newId, created);
     liftsBySlug.set(slug, created);
-    return id;
+    return newId;
   }
+
+  const droppedRows = [];
 
   const resolvedDays = days.map((day, dayIndex) => {
     const inputLifts = Array.isArray(day.lifts) ? day.lifts : [];
     const kept = [];
     inputLifts.forEach((lift, liftIndex) => {
-      if (isEmptyLiftRow(lift)) return;
-      let liftId = typeof lift?.liftId === "string" ? lift.liftId.trim() : "";
-      if (liftId && !liftsById.has(liftId)) {
-        liftId = "";
+      if (!rowHasContent(lift)) {
+        droppedRows.push({ dayIndex, liftIndex, reason: "empty" });
+        return;
       }
-      if (!liftId && lift?.newLift) {
-        liftId = resolveNewLift(lift.newLift, dayIndex, liftIndex);
+      const rawLiftId = typeof lift?.liftId === "string" ? lift.liftId.trim() : "";
+      const exerciseName = typeof lift?.exerciseName === "string" ? lift.exerciseName.trim() : "";
+      const newLift = lift?.newLift;
+
+      let liftId = "";
+      if (rawLiftId && liftsById.has(rawLiftId)) {
+        liftId = rawLiftId;
+      } else if (newLift && (newLift.name || "").trim()) {
+        liftId = ensureLibraryEntry({
+          name: newLift.name,
+          category: newLift.category,
+          sets: newLift.defaultSets ?? lift.sets,
+          reps: newLift.defaultReps ?? lift.reps,
+          weight: newLift.defaultWeight ?? lift.weight,
+          notes: newLift.defaultNotes ?? lift.notes
+        });
+      } else if (exerciseName) {
+        liftId = ensureLibraryEntry({
+          name: exerciseName,
+          category: "Custom",
+          sets: lift.sets,
+          reps: lift.reps,
+          weight: lift.weight,
+          notes: lift.notes
+        });
+      } else if (rawLiftId) {
+        // Stale liftId, no name to recover from — preserve the row
+        // by minting a placeholder library entry keyed to that id.
+        liftId = ensureLibraryEntry({
+          id: rawLiftId,
+          name: rawLiftId,
+          category: "Custom",
+          sets: lift.sets,
+          reps: lift.reps,
+          weight: lift.weight,
+          notes: lift.notes
+        });
       }
-      // The exerciseName may resolve to an existing library entry even
-      // if the client didn't attach a newLift (defensive — current
-      // client always attaches one). Try a slug lookup as a last step.
-      if (!liftId && typeof lift?.exerciseName === "string" && lift.exerciseName.trim()) {
-        const slug = slugify(lift.exerciseName);
-        const existing = liftsBySlug.get(slug);
-        if (existing) {
-          liftId = existing.id;
-        } else {
-          liftId = resolveNewLift(
-            {
-              name: lift.exerciseName,
-              category: "Custom",
-              defaultSets: lift.sets,
-              defaultReps: lift.reps,
-              defaultWeight: lift.weight,
-              defaultNotes: lift.notes
-            },
-            dayIndex,
-            liftIndex
-          );
-        }
+
+      if (!liftId) {
+        // Genuinely shouldn't happen given rowHasContent passed, but
+        // log it so we catch any edge case rather than failing silent.
+        droppedRows.push({ dayIndex, liftIndex, reason: "unresolved" });
+        return;
       }
-      if (!liftId) return; // shouldn't happen post-isEmptyLiftRow, but skip rather than throw
       kept.push({ ...lift, liftId });
     });
     return { ...day, lifts: kept };
   });
+
+  if (droppedRows.length > 0) {
+    console.warn(
+      "[programLibrary] resolveProgramLifts dropped rows:",
+      JSON.stringify(droppedRows)
+    );
+  }
 
   return { nextLifts, resolvedDays };
 }

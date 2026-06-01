@@ -167,6 +167,12 @@ export default function CoachWorkoutsPage() {
   const [activeSegment, setActiveSegment] = useState(0); // active day index OR active block index
   const focusNextRowRef = useRef(null);
 
+  // Pending-autosave handle so manual Save can cancel a queued PUT
+  // before firing its own. Avoids a race where the older autosave
+  // body overwrites the freshly-saved one.
+  const programAutosaveRef = useRef(null);
+  const miscAutosaveRef = useRef(null);
+
   // CSV import
   const csvInputRef = useRef(null);
   const [importing, setImporting] = useState(false);
@@ -258,10 +264,12 @@ export default function CoachWorkoutsPage() {
     setMiscModal({ open: true, mode: "edit", miscId: workout.id });
   }
 
-  function closeMiscModal() {
-    // Flush any pending autosave before tearing down the form so the
-    // 500ms debounce window can't drop a final edit on close.
-    if (miscModal.mode === "edit" && miscModal.miscId) {
+  function closeMiscModal({ skipFlush = false } = {}) {
+    if (miscAutosaveRef.current) {
+      clearTimeout(miscAutosaveRef.current);
+      miscAutosaveRef.current = null;
+    }
+    if (!skipFlush && miscModal.mode === "edit" && miscModal.miscId) {
       const body = buildMiscBody();
       apiRequest(`/api/program-library/misc/${miscModal.miscId}`, {
         method: "PUT",
@@ -367,6 +375,10 @@ export default function CoachWorkoutsPage() {
         return;
       }
     }
+    if (miscAutosaveRef.current) {
+      clearTimeout(miscAutosaveRef.current);
+      miscAutosaveRef.current = null;
+    }
     setMiscSubmitting(true);
     try {
       const body = buildMiscBody();
@@ -376,7 +388,7 @@ export default function CoachWorkoutsPage() {
       );
       if (!data?.library) throw new Error("Unexpected response from server.");
       setLibrary(data.library);
-      closeMiscModal();
+      closeMiscModal({ skipFlush: true });
       setToast(isEdit ? "Workout saved." : "Workout created.");
     } catch (e) {
       setMiscError(e.message);
@@ -385,15 +397,15 @@ export default function CoachWorkoutsPage() {
     }
   }
 
-  // Autosave misc workouts in edit mode. Same pattern as the program
-  // autosave above — debounced PUT keyed off the misc form, fires
-  // regardless of local row completeness.
+  // Autosave misc workouts in edit mode. Tracked via miscAutosaveRef
+  // so Save / close can cancel a queued PUT.
   useEffect(() => {
     if (!miscModal.open) return;
     if (miscModal.mode !== "edit") return;
     if (!miscModal.miscId) return;
 
     const timeout = setTimeout(async () => {
+      miscAutosaveRef.current = null;
       try {
         const body = buildMiscBody();
         const data = await apiRequest(
@@ -406,8 +418,12 @@ export default function CoachWorkoutsPage() {
         setMiscError(e.message || "Autosave failed");
       }
     }, 500);
+    miscAutosaveRef.current = timeout;
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      if (miscAutosaveRef.current === timeout) miscAutosaveRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [miscForm, miscModal.open, miscModal.mode, miscModal.miscId]);
 
@@ -455,13 +471,16 @@ export default function CoachWorkoutsPage() {
     setProgramModal({ open: true, mode: "edit", programId: program.id });
   }
 
-  function closeProgramModal() {
-    // Flush any pending autosave before tearing down the form so the
-    // 500ms debounce window can't drop a final edit on close. The
-    // local validateProgramForm check used to gate this — removed
-    // because partial rows are now server-accepted and skipping the
-    // flush was what caused edits to vanish on modal close.
-    if (programModal.mode === "edit" && programModal.programId) {
+  function closeProgramModal({ skipFlush = false } = {}) {
+    // Flush any pending autosave so the 500ms debounce window can't
+    // drop a final edit on close. Skipped after handleSaveProgram —
+    // that path already PUT the latest body and a second PUT here
+    // would just be a race.
+    if (programAutosaveRef.current) {
+      clearTimeout(programAutosaveRef.current);
+      programAutosaveRef.current = null;
+    }
+    if (!skipFlush && programModal.mode === "edit" && programModal.programId) {
       const body = buildProgramBody();
       apiRequest(`/api/program-library/programs/${programModal.programId}`, {
         method: "PUT",
@@ -620,15 +639,18 @@ export default function CoachWorkoutsPage() {
     event.preventDefault();
     setProgramError("");
     const isEdit = programModal.mode === "edit";
-    // Only block create-mode publish on local completeness. Edit mode
-    // trusts the server's lenient acceptance — partial rows persist
-    // and won't be silently dropped from the saved program.
     if (!isEdit) {
       const validationError = validateProgramForm();
       if (validationError) {
         setProgramError(validationError);
         return;
       }
+    }
+    // Kill any queued autosave so a stale body can't land after our
+    // explicit Save and erase the change.
+    if (programAutosaveRef.current) {
+      clearTimeout(programAutosaveRef.current);
+      programAutosaveRef.current = null;
     }
     setProgramSubmitting(true);
     try {
@@ -641,7 +663,7 @@ export default function CoachWorkoutsPage() {
       );
       if (!data?.library) throw new Error("Unexpected response from server.");
       setLibrary(data.library);
-      closeProgramModal();
+      closeProgramModal({ skipFlush: true });
       setToast(isEdit ? "Program saved." : "Program created.");
     } catch (e) {
       setProgramError(e.message);
@@ -651,17 +673,16 @@ export default function CoachWorkoutsPage() {
   }
 
   // Autosave the program in edit mode whenever the form changes.
-  // Debounced so we don't PUT after every keystroke. Fires regardless
-  // of whether every row is "complete" — the server now accepts
-  // partial rows and drops truly-empty drafts, so gating autosave on
-  // local validation was hiding edits behind silent failures (commit
-  // history: that's what made edits appear to "delete the row").
+  // Debounced PUT, tracked via programAutosaveRef so manual Save or
+  // modal close can cancel a queued one and prevent a stale-body PUT
+  // from clobbering a freshly-persisted state.
   useEffect(() => {
     if (!programModal.open) return;
     if (programModal.mode !== "edit") return;
     if (!programModal.programId) return;
 
     const timeout = setTimeout(async () => {
+      programAutosaveRef.current = null;
       try {
         const body = buildProgramBody();
         const data = await apiRequest(
@@ -674,10 +695,12 @@ export default function CoachWorkoutsPage() {
         setProgramError(e.message || "Autosave failed");
       }
     }, 500);
+    programAutosaveRef.current = timeout;
 
-    return () => clearTimeout(timeout);
-    // buildProgramBody reads programForm, so the form ref is the only
-    // signal we need; other deps stabilize the effect identity.
+    return () => {
+      clearTimeout(timeout);
+      if (programAutosaveRef.current === timeout) programAutosaveRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programForm, programModal.open, programModal.mode, programModal.programId]);
 
