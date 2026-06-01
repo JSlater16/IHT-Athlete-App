@@ -16,6 +16,14 @@ function sparklineForMetric(tests, key) {
     .filter((v) => Number.isFinite(v));
 }
 
+function sparklineForBodyMass(tests) {
+  return tests
+    .slice()
+    .reverse()
+    .map((t) => (Number.isFinite(Number(t.bodyMass)) ? Number(t.bodyMass) * 2.20462 : null))
+    .filter((v) => Number.isFinite(v));
+}
+
 export default function ForcedecksDashboard({ scope, athleteId, headerSlot }) {
   const { token, user } = useAuth();
   const [state, setState] = useState({ status: "loading", data: null, error: null });
@@ -121,6 +129,17 @@ function Body({ data, includeCoachMetrics, compareMode, onCompareModeChange, onS
       </div>
 
       <div className="fd-metric-grid">
+        {includeCoachMetrics && data.latestBodyMass?.value != null ? (
+          <MetricCard
+            label="Body Weight"
+            value={Number(data.latestBodyMass.value) * 2.20462}
+            unit="lb"
+            sparklineData={sparklineForBodyMass(data.tests)}
+            best={null}
+            compareValue={null}
+            compareLabel={compareLabel}
+          />
+        ) : null}
         {metrics.map((m) => {
           const latestValue = latest?.metrics?.[m.key]?.value ?? null;
           const compareValue =
