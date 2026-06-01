@@ -80,12 +80,19 @@ export default function MetricTrendModal({
   // Build oldest-first point series for the active metric. The API
   // returns newest-first; the chart wants oldest-first so dates flow
   // left-to-right.
+  // body_mass is a special metric: it lives on the test row itself
+  // (not in t.metrics), is stored in kg, and is displayed in lb.
   const points = useMemo(() => {
     const tests = state.data?.tests || [];
     return tests
       .slice()
       .reverse()
       .map((t) => {
+        if (metricKey === "body_mass") {
+          const kg = Number(t.bodyMass);
+          if (!Number.isFinite(kg) || kg <= 0) return null;
+          return { testDate: t.testDate, value: kg * 2.20462 };
+        }
         const m = t.metrics?.[metricKey];
         if (!m || !Number.isFinite(Number(m.value))) return null;
         return { testDate: t.testDate, value: Number(m.value) };

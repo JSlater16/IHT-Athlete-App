@@ -138,6 +138,9 @@ function Body({ data, includeCoachMetrics, compareMode, onCompareModeChange, onS
             best={null}
             compareValue={null}
             compareLabel={compareLabel}
+            onClick={() =>
+              onSelectMetric({ key: "body_mass", label: "Body Weight", unit: "lb" })
+            }
           />
         ) : null}
         {metrics.map((m) => {
