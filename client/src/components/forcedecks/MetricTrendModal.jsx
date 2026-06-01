@@ -102,7 +102,10 @@ export default function MetricTrendModal({
 
   const latest = points.length > 0 ? points[points.length - 1] : null;
   const previous = points.length > 1 ? points[points.length - 2] : null;
-  const pr = points.length > 0 ? Math.max(...points.map((p) => p.value)) : null;
+  // PR semantics don't apply to body weight — the heaviest recorded
+  // weight isn't a "record" worth tracking against.
+  const showPr = metricKey !== "body_mass";
+  const pr = showPr && points.length > 0 ? Math.max(...points.map((p) => p.value)) : null;
   const pct = latest && pr != null ? pctFromPr(latest.value, pr) : null;
 
   if (!open) return null;
@@ -142,28 +145,32 @@ export default function MetricTrendModal({
                     {previous ? `${formatValue(previous.value)}${unit ? ` ${unit}` : ""}` : "—"}
                   </div>
                 </div>
-                <div className="fd-trend-stat">
-                  <div className="fd-trend-stat-label">PR</div>
-                  <div className="fd-trend-stat-value">
-                    {pr != null ? `${formatValue(pr)}${unit ? ` ${unit}` : ""}` : "—"}
-                  </div>
-                </div>
-                <div className="fd-trend-stat">
-                  <div className="fd-trend-stat-label">vs PR</div>
-                  <div
-                    className={`fd-trend-stat-value ${
-                      pct == null
-                        ? ""
-                        : Math.abs(pct) < 0.05
-                        ? "is-pr"
-                        : pct < 0
-                        ? "is-down"
-                        : "is-up"
-                    }`}
-                  >
-                    {pctLabel(pct)}
-                  </div>
-                </div>
+                {showPr ? (
+                  <>
+                    <div className="fd-trend-stat">
+                      <div className="fd-trend-stat-label">PR</div>
+                      <div className="fd-trend-stat-value">
+                        {pr != null ? `${formatValue(pr)}${unit ? ` ${unit}` : ""}` : "—"}
+                      </div>
+                    </div>
+                    <div className="fd-trend-stat">
+                      <div className="fd-trend-stat-label">vs PR</div>
+                      <div
+                        className={`fd-trend-stat-value ${
+                          pct == null
+                            ? ""
+                            : Math.abs(pct) < 0.05
+                            ? "is-pr"
+                            : pct < 0
+                            ? "is-down"
+                            : "is-up"
+                        }`}
+                      >
+                        {pctLabel(pct)}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
               </div>
 
               <MetricTrendChart points={points} unit={unit} />
