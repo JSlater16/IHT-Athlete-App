@@ -74,8 +74,8 @@ export default function LiftTable({
             {showDayColumn ? <th>Day</th> : null}
             <th>Block</th>
             <th>Exercise</th>
-            <th>Sets</th>
-            <th>Reps</th>
+            <th className="lift-table-num-cell">Sets</th>
+            <th className="lift-table-num-cell">Reps</th>
             <th>Weight</th>
             {showLoggedColumn ? <th>Logged</th> : null}
             <th>Notes</th>
@@ -140,7 +140,7 @@ export default function LiftTable({
                     </span>
                   ) : null}
                 </td>
-                <td>
+                <td className="lift-table-num-cell">
                   <input
                     type="number"
                     min="1"
@@ -153,7 +153,7 @@ export default function LiftTable({
                     required
                   />
                 </td>
-                <td>
+                <td className="lift-table-num-cell">
                   <input
                     type="number"
                     min="1"

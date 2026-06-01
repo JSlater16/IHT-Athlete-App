@@ -546,6 +546,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.lift-table-num-cell {
+  width: 84px;
+  min-width: 84px;
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+  text-align: center;
+}
+
 .lift-table-exercise {
   min-width: 200px;
 }
