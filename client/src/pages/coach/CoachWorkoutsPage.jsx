@@ -569,8 +569,17 @@ export default function CoachWorkoutsPage() {
       lifts: d.lifts.map((l, i) => {
         if (i !== liftIndex) return l;
         if (field === "exerciseName") {
+          const trimmed = value.trim();
           const matched = liftByNormalizedName.get(normalizeText(value));
-          return { ...l, exerciseName: value, liftId: matched?.id || "" };
+          // Cases:
+          //  - empty: preserve the existing liftId so an accidental
+          //    clear doesn't strip the row's library reference and
+          //    cause it to be dropped on save.
+          //  - matched: lock to the matched library lift.
+          //  - non-empty, no match: clear liftId so the server treats
+          //    it as a new-lift declaration.
+          const nextLiftId = !trimmed ? l.liftId : matched?.id || "";
+          return { ...l, exerciseName: value, liftId: nextLiftId };
         }
         return { ...l, [field]: value };
       })
