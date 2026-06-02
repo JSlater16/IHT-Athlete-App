@@ -220,7 +220,9 @@ export default function CoachWorkoutsPage() {
   const [miscSearch, setMiscSearch] = useState("");
   const [liftSearch, setLiftSearch] = useState("");
   const [videoUploadingId, setVideoUploadingId] = useState(null);
-  const [videoModal, setVideoModal] = useState({ liftId: null, name: "" });
+  const [videoUrlSavingId, setVideoUrlSavingId] = useState(null);
+  const [videoUrlDraft, setVideoUrlDraft] = useState({}); // liftId → draft text
+  const [videoModal, setVideoModal] = useState({ liftId: null, name: "", videoUrl: null });
 
   // Misc workout modal (single-day standalone workouts)
   const [miscModal, setMiscModal] = useState({ open: false, mode: "create", miscId: null });
@@ -842,13 +844,13 @@ export default function CoachWorkoutsPage() {
 
   // ------- Lift video upload / delete / play -------
 
-  function setLiftHasVideo(liftId, hasVideo) {
+  function patchLiftVideo(liftId, patch) {
     setLibrary((cur) => {
       if (!cur) return cur;
       return {
         ...cur,
         liftLibrary: (cur.liftLibrary || []).map((l) =>
-          l.id === liftId ? { ...l, hasVideo } : l
+          l.id === liftId ? { ...l, ...patch } : l
         )
       };
     });
@@ -876,7 +878,9 @@ export default function CoachWorkoutsPage() {
         try { message = JSON.parse(text).error || message; } catch { /* keep text */ }
         throw new Error(message || "Upload failed.");
       }
-      setLiftHasVideo(liftId, true);
+      // Upload wins over any pasted URL — server already cleared it.
+      patchLiftVideo(liftId, { hasVideo: true, videoUrl: null });
+      setVideoUrlDraft((cur) => ({ ...cur, [liftId]: "" }));
       setToast("Video uploaded.");
     } catch (e) {
       setError(e.message || "Upload failed.");
@@ -892,19 +896,44 @@ export default function CoachWorkoutsPage() {
         method: "DELETE",
         token
       });
-      setLiftHasVideo(liftId, false);
+      patchLiftVideo(liftId, { hasVideo: false, videoUrl: null });
+      setVideoUrlDraft((cur) => ({ ...cur, [liftId]: "" }));
       setToast("Video removed.");
     } catch (e) {
       setError(e.message || "Delete failed.");
     }
   }
 
-  function openVideoModal(liftId, name) {
-    setVideoModal({ liftId, name });
+  async function handleVideoUrlSave(liftId) {
+    const raw = (videoUrlDraft[liftId] || "").trim();
+    if (!raw) {
+      setError("Paste a YouTube link first.");
+      return;
+    }
+    setVideoUrlSavingId(liftId);
+    setError("");
+    try {
+      const result = await apiRequest(`/api/program-library/lifts/${liftId}/video-url`, {
+        method: "POST",
+        token,
+        body: { url: raw }
+      });
+      patchLiftVideo(liftId, { hasVideo: true, videoUrl: result.videoUrl });
+      setVideoUrlDraft((cur) => ({ ...cur, [liftId]: "" }));
+      setToast("YouTube link saved.");
+    } catch (e) {
+      setError(e.message || "Could not save the link.");
+    } finally {
+      setVideoUrlSavingId(null);
+    }
+  }
+
+  function openVideoModal(liftId, name, videoUrl) {
+    setVideoModal({ liftId, name, videoUrl: videoUrl || null });
   }
 
   function closeVideoModal() {
-    setVideoModal({ liftId: null, name: "" });
+    setVideoModal({ liftId: null, name: "", videoUrl: null });
   }
 
   const filteredLifts = useMemo(() => {
@@ -1032,20 +1061,28 @@ export default function CoachWorkoutsPage() {
           <ul className="exercise-video-list">
             {filteredLifts.map((lift) => {
               const isUploading = videoUploadingId === lift.id;
+              const isSavingUrl = videoUrlSavingId === lift.id;
+              const draft = videoUrlDraft[lift.id] ?? "";
+              const sourceLabel = lift.videoUrl
+                ? "YouTube"
+                : lift.hasVideo
+                ? "Uploaded"
+                : null;
               return (
                 <li className="exercise-video-row" key={lift.id}>
                   <div className="exercise-video-meta">
                     <strong>{lift.name}</strong>
-                    {lift.category ? (
-                      <span className="muted-copy compact-copy">{lift.category}</span>
-                    ) : null}
+                    <span className="muted-copy compact-copy">
+                      {lift.category}
+                      {sourceLabel ? ` · ${sourceLabel}` : ""}
+                    </span>
                   </div>
                   <div className="exercise-video-actions">
                     {lift.hasVideo ? (
                       <button
                         type="button"
                         className="ghost-button compact-button"
-                        onClick={() => openVideoModal(lift.id, lift.name)}
+                        onClick={() => openVideoModal(lift.id, lift.name, lift.videoUrl)}
                       >
                         ▶ Play
                       </button>
@@ -1063,6 +1100,31 @@ export default function CoachWorkoutsPage() {
                       />
                       {isUploading ? "Uploading…" : lift.hasVideo ? "Replace" : "Upload"}
                     </label>
+                    <form
+                      className="exercise-video-url-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        handleVideoUrlSave(lift.id);
+                      }}
+                    >
+                      <input
+                        type="url"
+                        className="exercise-video-url-input"
+                        placeholder="Paste YouTube link"
+                        value={draft}
+                        onChange={(event) =>
+                          setVideoUrlDraft((cur) => ({ ...cur, [lift.id]: event.target.value }))
+                        }
+                        disabled={isSavingUrl}
+                      />
+                      <button
+                        type="submit"
+                        className="ghost-button compact-button"
+                        disabled={isSavingUrl || !draft.trim()}
+                      >
+                        {isSavingUrl ? "Saving…" : "Save"}
+                      </button>
+                    </form>
                     {lift.hasVideo ? (
                       <button
                         type="button"
@@ -1231,6 +1293,7 @@ export default function CoachWorkoutsPage() {
         <VideoModal
           liftId={videoModal.liftId}
           title={videoModal.name}
+          videoUrl={videoModal.videoUrl}
           onClose={closeVideoModal}
         />
       ) : null}

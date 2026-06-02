@@ -38,7 +38,7 @@ export default function LiftTable({
   showLoggedColumn,
   focusNextRowRef
 }) {
-  const [videoState, setVideoState] = useState({ liftId: null, name: "" });
+  const [videoState, setVideoState] = useState({ liftId: null, name: "", videoUrl: null });
   const handleBlur = (dayIndex, liftIndex, field, value) => {
     if (onCommitField) onCommitField(dayIndex, liftIndex, field, value);
   };
@@ -89,12 +89,15 @@ export default function LiftTable({
             const rowKey = `${dayIndex}-${liftIndex}`;
             const matched = lookup.get(normalizeText(lift.exerciseName));
             const willCreate = lift.exerciseName.trim() && !matched;
-            // hasVideo / videoLiftId may come from the server-decorated
-            // lift row (athlete week, coach week) OR from the library
-            // map (program builder). Take whichever is available.
+            // hasVideo / videoLiftId / videoUrl may come from the
+            // server-decorated lift row (athlete week, coach week) OR
+            // from the library map (program builder). Prefer whichever
+            // is present.
             const videoLiftId = lift.videoLiftId || matched?.id || null;
+            const videoUrl = lift.videoUrl || matched?.videoUrl || null;
             const hasVideo = Boolean(
-              videoLiftId && (lift.hasVideo === true || matched?.hasVideo === true)
+              videoLiftId &&
+                (lift.hasVideo === true || matched?.hasVideo === true || videoUrl)
             );
             return (
               <tr key={rowKey} className="lift-table-row">
@@ -144,7 +147,11 @@ export default function LiftTable({
                         type="button"
                         className="lift-table-play"
                         onClick={() =>
-                          setVideoState({ liftId: videoLiftId, name: lift.exerciseName })
+                          setVideoState({
+                            liftId: videoLiftId,
+                            name: lift.exerciseName,
+                            videoUrl
+                          })
                         }
                         aria-label={`Play ${lift.exerciseName} demo video`}
                         title="Play demo video"
@@ -294,7 +301,8 @@ export default function LiftTable({
         <VideoModal
           liftId={videoState.liftId}
           title={videoState.name}
-          onClose={() => setVideoState({ liftId: null, name: "" })}
+          videoUrl={videoState.videoUrl}
+          onClose={() => setVideoState({ liftId: null, name: "", videoUrl: null })}
         />
       ) : null}
     </div>

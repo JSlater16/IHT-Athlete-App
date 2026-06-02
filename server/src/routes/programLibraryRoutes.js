@@ -17,6 +17,7 @@ const {
   deleteVideo,
   MAX_VIDEO_BYTES
 } = require("../utils/videoStorage");
+const { parseYouTubeId, canonicalYouTubeUrl } = require("../utils/youtubeUrl");
 const { resolveProgramVariant, standardProgramVariant } = require("../utils/programVariant");
 const { recordAudit } = require("../utils/audit");
 const { applyCsvToLibrary } = require("../utils/csvImporter");
@@ -324,13 +325,19 @@ function libraryResponse(library) {
 }
 
 // Decorates each lift in liftLibrary with `hasVideo: true|false` so
-// clients can render a play icon without a second roundtrip.
+// clients can render a play icon without a second roundtrip. A lift
+// can have either an uploaded mp4 (file on disk) or a YouTube URL
+// stored on the library row — never both at once.
 async function libraryResponseWithVideos(library) {
   const videoIds = await listVideoIds();
-  const liftLibrary = library.liftLibrary.map((lift) => ({
-    ...lift,
-    hasVideo: videoIds.has(lift.id)
-  }));
+  const liftLibrary = library.liftLibrary.map((lift) => {
+    const videoUrl = typeof lift.videoUrl === "string" && lift.videoUrl ? lift.videoUrl : null;
+    return {
+      ...lift,
+      videoUrl,
+      hasVideo: videoIds.has(lift.id) || Boolean(videoUrl)
+    };
+  });
   return libraryResponse({ ...library, liftLibrary });
 }
 
@@ -642,9 +649,28 @@ router.delete("/lifts/:id", async (req, res, next) => {
   }
 });
 
+// Helper: rewrite a single lift in the library JSON, dropping
+// videoUrl when `nextUrl` is null. Atomic via writeProgramLibrary.
+async function updateLiftVideoUrl(liftId, nextUrl) {
+  const library = await readProgramLibrary();
+  const target = library.liftLibrary.find((l) => l.id === liftId);
+  if (!target) return null;
+  const before = target.videoUrl || null;
+  const nextLifts = library.liftLibrary.map((l) => {
+    if (l.id !== liftId) return l;
+    if (nextUrl) return { ...l, videoUrl: nextUrl };
+    const { videoUrl: _drop, ...rest } = l;
+    return rest;
+  });
+  const nextLibrary = { ...library, liftLibrary: nextLifts };
+  await writeProgramLibrary(nextLibrary);
+  return { target, before, after: nextUrl };
+}
+
 // POST /api/program-library/lifts/:id/video — upload (or replace) the
 // demo video for a lift. Multipart form-data, field name "video",
-// .mp4 only, max 50 MB. Replaces any existing file atomically.
+// .mp4 only, max 50 MB. Replaces any existing file atomically and
+// clears any stored YouTube URL so playback is unambiguous.
 router.post(
   "/lifts/:id/video",
   (req, res, next) =>
@@ -668,6 +694,10 @@ router.post(
       }
       await ensureVideosDir();
       await fs.promises.rename(req.file.path, videoPath(target.id));
+      // Upload wins over a pasted URL — drop the URL field on the lift.
+      if (target.videoUrl) {
+        await updateLiftVideoUrl(target.id, null);
+      }
       await recordAudit({
         req,
         action: "program_library.video.upload",
@@ -676,7 +706,7 @@ router.post(
         targetLabel: target.name,
         metadata: { bytes: req.file.size }
       });
-      return res.json({ liftId: target.id, hasVideo: true });
+      return res.json({ liftId: target.id, hasVideo: true, videoUrl: null });
     } catch (error) {
       if (req.file?.path) {
         await fs.promises.unlink(req.file.path).catch(() => {});
@@ -686,8 +716,38 @@ router.post(
   }
 );
 
-// DELETE /api/program-library/lifts/:id/video — remove the demo video
-// without touching the lift itself.
+// POST /api/program-library/lifts/:id/video-url — link a YouTube URL
+// to a lift. Replaces any uploaded mp4 (only one source per lift).
+router.post("/lifts/:id/video-url", async (req, res, next) => {
+  try {
+    const raw = typeof req.body?.url === "string" ? req.body.url : "";
+    const id = parseYouTubeId(raw);
+    if (!id) {
+      return res.status(400).json({ error: "Paste a valid YouTube link." });
+    }
+    const url = canonicalYouTubeUrl(id);
+    const update = await updateLiftVideoUrl(req.params.id, url);
+    if (!update) {
+      return res.status(404).json({ error: "Lift not found." });
+    }
+    // Setting a URL wins over any uploaded file — drop it.
+    await deleteVideo(update.target.id).catch(() => {});
+    await recordAudit({
+      req,
+      action: "program_library.video.url.set",
+      targetType: "lift_library_entry",
+      targetId: update.target.id,
+      targetLabel: update.target.name,
+      metadata: { url }
+    });
+    return res.json({ liftId: update.target.id, hasVideo: true, videoUrl: url });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// DELETE /api/program-library/lifts/:id/video — clear both the
+// uploaded file and any stored YouTube URL for this lift.
 router.delete("/lifts/:id/video", async (req, res, next) => {
   try {
     const library = await readProgramLibrary();
@@ -695,17 +755,22 @@ router.delete("/lifts/:id/video", async (req, res, next) => {
     if (!target) {
       return res.status(404).json({ error: "Lift not found." });
     }
-    const removed = await deleteVideo(target.id);
-    if (removed) {
+    const fileRemoved = await deleteVideo(target.id);
+    const hadUrl = Boolean(target.videoUrl);
+    if (hadUrl) {
+      await updateLiftVideoUrl(target.id, null);
+    }
+    if (fileRemoved || hadUrl) {
       await recordAudit({
         req,
         action: "program_library.video.delete",
         targetType: "lift_library_entry",
         targetId: target.id,
-        targetLabel: target.name
+        targetLabel: target.name,
+        metadata: { fileRemoved, urlRemoved: hadUrl }
       });
     }
-    return res.json({ liftId: target.id, hasVideo: false });
+    return res.json({ liftId: target.id, hasVideo: false, videoUrl: null });
   } catch (error) {
     return next(error);
   }

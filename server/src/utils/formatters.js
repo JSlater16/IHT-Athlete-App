@@ -17,6 +17,7 @@ function serializeLift(lift) {
     notes: lift.notes,
     completed: lift.completed,
     videoLiftId: lift.videoLiftId ?? null,
+    videoUrl: lift.videoUrl ?? null,
     hasVideo: lift.hasVideo === true,
     createdAt: lift.createdAt,
     updatedAt: lift.updatedAt
