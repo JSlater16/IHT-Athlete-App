@@ -45,6 +45,77 @@ function phaseClass(phase) {
   return `phase-${phase ? phase.toLowerCase() : "default"}`;
 }
 
+// CSV columns match REQUIRED_COLUMNS in server/src/utils/csvImporter.js
+// so an exported program round-trips cleanly through the existing
+// importer. Order is preserved.
+const PROGRAM_CSV_COLUMNS = [
+  "program_id", "program_name", "program_phase", "program_variant",
+  "program_frequency", "day_offset", "day_name", "block_label", "order",
+  "lift_id", "exercise_name", "category", "sets", "reps", "weight", "notes"
+];
+
+function csvEscape(value) {
+  const s = value == null ? "" : String(value);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function buildProgramFamilyCsv(family, liftLibrary) {
+  const byId = new Map((liftLibrary || []).map((l) => [l.id, l]));
+  const programs = Array.from(family.byFrequency.values()).sort(
+    (a, b) => Number(a.frequency) - Number(b.frequency)
+  );
+  const lines = [PROGRAM_CSV_COLUMNS.join(",")];
+  for (const program of programs) {
+    for (const day of program.days || []) {
+      (day.lifts || []).forEach((lift, idx) => {
+        const libLift = byId.get(lift.liftId);
+        const row = {
+          program_id: program.id,
+          program_name: program.name,
+          program_phase: program.phase,
+          program_variant: program.variant || standardProgramVariant,
+          program_frequency: program.frequency,
+          day_offset: day.dayOffset,
+          day_name: "",
+          block_label: lift.blockLabel || "",
+          order: idx + 1,
+          lift_id: lift.liftId || "",
+          exercise_name: libLift?.name || "",
+          category: libLift?.category || "",
+          sets: lift.sets,
+          reps: lift.reps,
+          weight: lift.weight || "",
+          notes: lift.notes || ""
+        };
+        lines.push(PROGRAM_CSV_COLUMNS.map((c) => csvEscape(row[c])).join(","));
+      });
+    }
+  }
+  return lines.join("\n") + "\n";
+}
+
+function safeFilenamePart(value) {
+  return String(value || "").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+}
+
+function downloadProgramFamilyCsv(family, liftLibrary) {
+  const csv = buildProgramFamilyCsv(family, liftLibrary);
+  const name = safeFilenamePart(family.name) || "program";
+  const variant = family.variant && family.variant !== standardProgramVariant
+    ? `_${safeFilenamePart(family.variant)}`
+    : "";
+  const filename = `${name}${variant}.csv`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function createProgramLiftRow() {
   return {
     liftId: "",
@@ -838,6 +909,7 @@ export default function CoachWorkoutsPage() {
               <ProgramFamilyCard
                 key={family.key}
                 family={family}
+                liftLibrary={library?.liftLibrary || []}
                 onOpenFrequency={openFamilyFrequency}
               />
             ))}
@@ -997,7 +1069,7 @@ export default function CoachWorkoutsPage() {
 
 // ------- Components -------
 
-function ProgramFamilyCard({ family, onOpenFrequency }) {
+function ProgramFamilyCard({ family, liftLibrary, onOpenFrequency }) {
   return (
     <article className={`program-family-card ${phaseClass(family.phase)}`}>
       <header className="program-family-card-header">
@@ -1008,6 +1080,19 @@ function ProgramFamilyCard({ family, onOpenFrequency }) {
             {family.variant && family.variant !== standardProgramVariant ? ` · ${family.variant}` : ""}
           </p>
         </div>
+        <button
+          type="button"
+          className="program-family-download"
+          onClick={() => downloadProgramFamilyCsv(family, liftLibrary)}
+          aria-label={`Download ${family.name} as CSV`}
+          title="Download as CSV"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
       </header>
       <div className="program-family-frequencies">
         {allFrequencies.map((freq) => {
