@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { weightDelta } from "../utils/weight";
+import VideoModal from "./VideoModal";
 
 const workoutPlacementOptions = ["Prep", "Block 1", "Block 2", "Block 3", "Block 4"];
 
@@ -37,6 +38,7 @@ export default function LiftTable({
   showLoggedColumn,
   focusNextRowRef
 }) {
+  const [videoState, setVideoState] = useState({ liftId: null, name: "" });
   const handleBlur = (dayIndex, liftIndex, field, value) => {
     if (onCommitField) onCommitField(dayIndex, liftIndex, field, value);
   };
@@ -87,6 +89,13 @@ export default function LiftTable({
             const rowKey = `${dayIndex}-${liftIndex}`;
             const matched = lookup.get(normalizeText(lift.exerciseName));
             const willCreate = lift.exerciseName.trim() && !matched;
+            // hasVideo / videoLiftId may come from the server-decorated
+            // lift row (athlete week, coach week) OR from the library
+            // map (program builder). Take whichever is available.
+            const videoLiftId = lift.videoLiftId || matched?.id || null;
+            const hasVideo = Boolean(
+              videoLiftId && (lift.hasVideo === true || matched?.hasVideo === true)
+            );
             return (
               <tr key={rowKey} className="lift-table-row">
                 {showDayColumn ? (
@@ -113,22 +122,39 @@ export default function LiftTable({
                   </select>
                 </td>
                 <td className="lift-table-exercise">
-                  <input
-                    ref={(el) => {
-                      if (el) exerciseInputsRef.current[rowKey] = el;
-                    }}
-                    list={`builder-lifts-${rowKey}`}
-                    className="lift-table-input"
-                    value={lift.exerciseName}
-                    onChange={(e) =>
-                      onUpdateLiftField(dayIndex, liftIndex, "exerciseName", e.target.value)
-                    }
-                    onBlur={(e) =>
-                      handleBlur(dayIndex, liftIndex, "exerciseName", e.target.value)
-                    }
-                    placeholder="Type or pick"
-                    required
-                  />
+                  <div className="lift-table-exercise-row">
+                    <input
+                      ref={(el) => {
+                        if (el) exerciseInputsRef.current[rowKey] = el;
+                      }}
+                      list={`builder-lifts-${rowKey}`}
+                      className="lift-table-input"
+                      value={lift.exerciseName}
+                      onChange={(e) =>
+                        onUpdateLiftField(dayIndex, liftIndex, "exerciseName", e.target.value)
+                      }
+                      onBlur={(e) =>
+                        handleBlur(dayIndex, liftIndex, "exerciseName", e.target.value)
+                      }
+                      placeholder="Type or pick"
+                      required
+                    />
+                    {hasVideo ? (
+                      <button
+                        type="button"
+                        className="lift-table-play"
+                        onClick={() =>
+                          setVideoState({ liftId: videoLiftId, name: lift.exerciseName })
+                        }
+                        aria-label={`Play ${lift.exerciseName} demo video`}
+                        title="Play demo video"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </button>
+                    ) : null}
+                  </div>
                   <datalist id={`builder-lifts-${rowKey}`}>
                     {(library?.liftLibrary || []).map((l) => (
                       <option key={l.id} value={l.name} />
@@ -264,6 +290,13 @@ export default function LiftTable({
           })}
         </tbody>
       </table>
+      {videoState.liftId ? (
+        <VideoModal
+          liftId={videoState.liftId}
+          title={videoState.name}
+          onClose={() => setVideoState({ liftId: null, name: "" })}
+        />
+      ) : null}
     </div>
   );
 }

@@ -8,6 +8,8 @@ const { buildPhaseTimeline } = require("../utils/phasePlan");
 const { standardProgramVariant } = require("../utils/programVariant");
 const { enrichLiftBlocks } = require("../utils/liftBlocks");
 const { attachLastLoggedWeight } = require("../utils/liftHistory");
+const { attachVideoFlag } = require("../utils/liftVideo");
+const { listVideoIds } = require("../utils/videoStorage");
 const { parseRehabProfile } = require("../utils/rehabProfile");
 const { validatePassword } = require("../utils/password");
 const { passwordChangeLimiter } = require("../utils/rateLimiters");
@@ -83,8 +85,10 @@ router.get("/lifts", async (req, res, next) => {
       library
     });
     const withHistory = await attachLastLoggedWeight(enrichedLifts);
+    const videoIds = await listVideoIds();
+    const withVideo = attachVideoFlag(withHistory, library, videoIds);
 
-    return res.json({ lifts: withHistory.map(serializeLift) });
+    return res.json({ lifts: withVideo.map(serializeLift) });
   } catch (error) {
     return next(error);
   }

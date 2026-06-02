@@ -14,7 +14,19 @@ const staffRoutes = require("./routes/staffRoutes");
 const auditRoutes = require("./routes/auditRoutes");
 const forcedecksRoutes = require("./routes/forcedecksRoutes");
 const valdRoutes = require("./routes/valdRoutes");
+const exerciseVideoRoutes = require("./routes/exerciseVideoRoutes");
 const { requireAuth, requireAthlete, requireCoach, requireOwner } = require("./middleware/auth");
+
+// 1080 Motion ("onezero") routes are still being iterated locally and
+// haven't been committed. Mirror the optional-require pattern in
+// index.js so production deploys without the module work cleanly while
+// local dev keeps mounting them when present.
+let onezeroRoutes = null;
+try {
+  onezeroRoutes = require("./routes/onezeroRoutes");
+} catch (err) {
+  if (err?.code !== "MODULE_NOT_FOUND") throw err;
+}
 
 const app = express();
 const clientDistPath = path.resolve(__dirname, "..", "..", "client", "dist");
@@ -100,6 +112,15 @@ app.use("/api/me", requireAuth, requireAthlete, meRoutes);
    vs coach-roster vs coach-ingest) so we only require auth here. */
 app.use("/api/forcedecks", requireAuth, forcedecksRoutes);
 app.use("/api/vald", requireAuth, requireCoach, valdRoutes);
+/* exerciseVideoRoutes does its own auth — the GET stream accepts a
+   query-string token because <video> tags can't send the Authorization
+   header. Mounted before any role-gating middleware. */
+app.use("/api/exercise-videos", exerciseVideoRoutes);
+/* onezeroRoutes does its own per-route role gating (athlete-self vs
+   coach-roster vs coach-sync) so we only require auth here. */
+if (onezeroRoutes) {
+  app.use("/api/onezero", requireAuth, onezeroRoutes);
+}
 
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));

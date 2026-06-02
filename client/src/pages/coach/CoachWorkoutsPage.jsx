@@ -3,6 +3,9 @@ import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
 import ConfirmModal from "../../components/ConfirmModal";
 import LiftTable from "../../components/LiftTable";
+import VideoModal from "../../components/VideoModal";
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 const phaseOptions = ["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"];
 const allFrequencies = [3, 4, 5];
@@ -215,6 +218,9 @@ export default function CoachWorkoutsPage() {
 
   const [programSearch, setProgramSearch] = useState("");
   const [miscSearch, setMiscSearch] = useState("");
+  const [liftSearch, setLiftSearch] = useState("");
+  const [videoUploadingId, setVideoUploadingId] = useState(null);
+  const [videoModal, setVideoModal] = useState({ liftId: null, name: "" });
 
   // Misc workout modal (single-day standalone workouts)
   const [miscModal, setMiscModal] = useState({ open: false, mode: "create", miscId: null });
@@ -834,6 +840,84 @@ export default function CoachWorkoutsPage() {
     }
   }
 
+  // ------- Lift video upload / delete / play -------
+
+  function setLiftHasVideo(liftId, hasVideo) {
+    setLibrary((cur) => {
+      if (!cur) return cur;
+      return {
+        ...cur,
+        liftLibrary: (cur.liftLibrary || []).map((l) =>
+          l.id === liftId ? { ...l, hasVideo } : l
+        )
+      };
+    });
+  }
+
+  async function handleVideoUpload(liftId, file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".mp4")) {
+      setError("Only .mp4 video files are supported.");
+      return;
+    }
+    setVideoUploadingId(liftId);
+    setError("");
+    try {
+      const form = new FormData();
+      form.append("video", file);
+      const response = await fetch(`${API_BASE_URL}/api/program-library/lifts/${liftId}/video`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        let message = text;
+        try { message = JSON.parse(text).error || message; } catch { /* keep text */ }
+        throw new Error(message || "Upload failed.");
+      }
+      setLiftHasVideo(liftId, true);
+      setToast("Video uploaded.");
+    } catch (e) {
+      setError(e.message || "Upload failed.");
+    } finally {
+      setVideoUploadingId(null);
+    }
+  }
+
+  async function handleVideoDelete(liftId) {
+    setError("");
+    try {
+      await apiRequest(`/api/program-library/lifts/${liftId}/video`, {
+        method: "DELETE",
+        token
+      });
+      setLiftHasVideo(liftId, false);
+      setToast("Video removed.");
+    } catch (e) {
+      setError(e.message || "Delete failed.");
+    }
+  }
+
+  function openVideoModal(liftId, name) {
+    setVideoModal({ liftId, name });
+  }
+
+  function closeVideoModal() {
+    setVideoModal({ liftId: null, name: "" });
+  }
+
+  const filteredLifts = useMemo(() => {
+    const lifts = library?.liftLibrary || [];
+    const q = liftSearch.trim().toLowerCase();
+    if (!q) return lifts;
+    return lifts.filter(
+      (l) =>
+        (l.name || "").toLowerCase().includes(q) ||
+        (l.category || "").toLowerCase().includes(q)
+    );
+  }, [library, liftSearch]);
+
   // ------- Render -------
 
   return (
@@ -915,6 +999,85 @@ export default function CoachWorkoutsPage() {
             ))}
           </div>
         ) : null}
+      </section>
+
+      <section className="dashboard-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Library</p>
+            <h2>Exercise videos</h2>
+            <p className="muted-copy compact-copy">
+              Upload a demo clip for any lift (mp4, up to 50 MB). Athletes see a play icon next to the exercise in their weekly view.
+            </p>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search exercises"
+            value={liftSearch}
+            onChange={(event) => setLiftSearch(event.target.value)}
+          />
+        </div>
+
+        {loading ? (
+          <p className="empty-state">Loading…</p>
+        ) : filteredLifts.length === 0 ? (
+          <p className="empty-state">
+            {liftSearch ? `No exercises match "${liftSearch}".` : "No exercises in the library."}
+          </p>
+        ) : (
+          <ul className="exercise-video-list">
+            {filteredLifts.map((lift) => {
+              const isUploading = videoUploadingId === lift.id;
+              return (
+                <li className="exercise-video-row" key={lift.id}>
+                  <div className="exercise-video-meta">
+                    <strong>{lift.name}</strong>
+                    {lift.category ? (
+                      <span className="muted-copy compact-copy">{lift.category}</span>
+                    ) : null}
+                  </div>
+                  <div className="exercise-video-actions">
+                    {lift.hasVideo ? (
+                      <button
+                        type="button"
+                        className="ghost-button compact-button"
+                        onClick={() => openVideoModal(lift.id, lift.name)}
+                      >
+                        ▶ Play
+                      </button>
+                    ) : null}
+                    <label className={`exercise-video-upload ${isUploading ? "is-busy" : ""}`}>
+                      <input
+                        type="file"
+                        accept="video/mp4,.mp4"
+                        disabled={isUploading}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          if (file) handleVideoUpload(lift.id, file);
+                        }}
+                      />
+                      {isUploading ? "Uploading…" : lift.hasVideo ? "Replace" : "Upload"}
+                    </label>
+                    {lift.hasVideo ? (
+                      <button
+                        type="button"
+                        className="ghost-button compact-button"
+                        onClick={() => handleVideoDelete(lift.id)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="dashboard-card">
@@ -1063,6 +1226,14 @@ export default function CoachWorkoutsPage() {
         onConfirm={confirmMiscDelete}
         onCancel={() => setPendingMiscDelete(null)}
       />
+
+      {videoModal.liftId ? (
+        <VideoModal
+          liftId={videoModal.liftId}
+          title={videoModal.name}
+          onClose={closeVideoModal}
+        />
+      ) : null}
     </div>
   );
 }

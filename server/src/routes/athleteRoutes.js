@@ -6,6 +6,8 @@ const { parseDateInput, getWeekRange } = require("../utils/date");
 const { readProgramLibrary, summarizeProgramLibrary } = require("../utils/programLibrary");
 const { enrichLiftBlocks } = require("../utils/liftBlocks");
 const { attachLastLoggedWeight } = require("../utils/liftHistory");
+const { attachVideoFlag } = require("../utils/liftVideo");
+const { listVideoIds } = require("../utils/videoStorage");
 const { normalizeRehabProfile } = require("../utils/rehabProfile");
 const {
   standardProgramVariant,
@@ -505,8 +507,10 @@ router.get("/:id/lifts", async (req, res, next) => {
       library
     });
     const withHistory = await attachLastLoggedWeight(enrichedLifts);
+    const videoIds = await listVideoIds();
+    const withVideo = attachVideoFlag(withHistory, library, videoIds);
 
-    return res.json({ lifts: withHistory.map(serializeLift) });
+    return res.json({ lifts: withVideo.map(serializeLift) });
   } catch (error) {
     return next(error);
   }

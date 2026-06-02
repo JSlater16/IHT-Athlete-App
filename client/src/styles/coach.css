@@ -588,6 +588,154 @@
   text-align: center;
 }
 
+.lift-table-exercise-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.lift-table-exercise-row .lift-table-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lift-table-play {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.lift-table-play:hover {
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  border-color: transparent;
+  transform: scale(1.05);
+}
+
+.lift-table-play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.exercise-video-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  max-height: 520px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.5rem;
+  background: var(--surface);
+}
+
+.exercise-video-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.exercise-video-row:last-child {
+  border-bottom: none;
+}
+
+.exercise-video-row:hover {
+  background: var(--surface-translucent);
+}
+
+.exercise-video-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.exercise-video-meta strong {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.exercise-video-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.exercise-video-upload {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+
+.exercise-video-upload:hover {
+  border-color: var(--accent);
+}
+
+.exercise-video-upload input[type="file"] {
+  display: none;
+}
+
+.exercise-video-upload.is-busy {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.video-modal-card {
+  width: min(720px, 92vw);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.video-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.video-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.video-modal-player {
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+  border-radius: 10px;
+  display: block;
+}
+
+.compact-button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+}
+
 .lift-table-exercise {
   min-width: 200px;
 }

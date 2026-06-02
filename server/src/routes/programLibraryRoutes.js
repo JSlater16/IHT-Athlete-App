@@ -1,4 +1,8 @@
 const express = require("express");
+const path = require("path");
+const fs = require("fs");
+const os = require("os");
+const multer = require("multer");
 const {
   readProgramLibrary,
   summarizeProgramLibrary,
@@ -6,11 +10,41 @@ const {
   assertValidLibrary,
   writeProgramLibrary
 } = require("../utils/programLibrary");
+const {
+  ensureVideosDir,
+  videoPath,
+  listVideoIds,
+  deleteVideo,
+  MAX_VIDEO_BYTES
+} = require("../utils/videoStorage");
 const { resolveProgramVariant, standardProgramVariant } = require("../utils/programVariant");
 const { recordAudit } = require("../utils/audit");
 const { applyCsvToLibrary } = require("../utils/csvImporter");
 
 const router = express.Router();
+
+// Multer stores uploads in a temp dir first (so an upload that exceeds
+// the limit doesn't pollute the real videos dir) and the route then
+// renames the file onto the persistent disk. mp4 only — universal
+// browser playback and avoids per-format transcoding.
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const tmp = path.join(os.tmpdir(), "lift-video-uploads");
+      fs.mkdir(tmp, { recursive: true }, (err) => cb(err, tmp));
+    },
+    filename: (_req, _file, cb) => {
+      cb(null, `upload-${Date.now()}-${Math.random().toString(36).slice(2)}.mp4`);
+    }
+  }),
+  limits: { fileSize: MAX_VIDEO_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const okMime = file.mimetype === "video/mp4" || file.mimetype === "application/octet-stream";
+    const okExt = (file.originalname || "").toLowerCase().endsWith(".mp4");
+    if (okMime && okExt) return cb(null, true);
+    return cb(new Error("Only .mp4 video files are supported."));
+  }
+});
 const allowedPhases = new Set(["Rehab", "Prep", "Eccentrics", "Iso", "Power", "Speed"]);
 const allowedFrequencies = new Set([3, 4, 5]);
 
@@ -289,10 +323,21 @@ function libraryResponse(library) {
   return { library, summary: summarizeProgramLibrary(library) };
 }
 
+// Decorates each lift in liftLibrary with `hasVideo: true|false` so
+// clients can render a play icon without a second roundtrip.
+async function libraryResponseWithVideos(library) {
+  const videoIds = await listVideoIds();
+  const liftLibrary = library.liftLibrary.map((lift) => ({
+    ...lift,
+    hasVideo: videoIds.has(lift.id)
+  }));
+  return libraryResponse({ ...library, liftLibrary });
+}
+
 router.get("/", async (_req, res, next) => {
   try {
     const library = await readProgramLibrary();
-    return res.json(libraryResponse(library));
+    return res.json(await libraryResponseWithVideos(library));
   } catch (error) {
     return next(error);
   }
@@ -587,7 +632,80 @@ router.delete("/lifts/:id", async (req, res, next) => {
       metadata: { category: target.category }
     });
 
+    // Also clean up any video file tied to this lift so we don't leak
+    // bytes on the persistent disk when the lift goes away.
+    await deleteVideo(target.id).catch(() => {});
+
     return res.json(libraryResponse(nextLibrary));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// POST /api/program-library/lifts/:id/video — upload (or replace) the
+// demo video for a lift. Multipart form-data, field name "video",
+// .mp4 only, max 50 MB. Replaces any existing file atomically.
+router.post(
+  "/lifts/:id/video",
+  (req, res, next) =>
+    videoUpload.single("video")(req, res, (err) => {
+      if (!err) return next();
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ error: "Video must be 50 MB or smaller." });
+      }
+      return res.status(400).json({ error: err.message || "Upload failed." });
+    }),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded." });
+      }
+      const library = await readProgramLibrary();
+      const target = library.liftLibrary.find((l) => l.id === req.params.id);
+      if (!target) {
+        await fs.promises.unlink(req.file.path).catch(() => {});
+        return res.status(404).json({ error: "Lift not found." });
+      }
+      await ensureVideosDir();
+      await fs.promises.rename(req.file.path, videoPath(target.id));
+      await recordAudit({
+        req,
+        action: "program_library.video.upload",
+        targetType: "lift_library_entry",
+        targetId: target.id,
+        targetLabel: target.name,
+        metadata: { bytes: req.file.size }
+      });
+      return res.json({ liftId: target.id, hasVideo: true });
+    } catch (error) {
+      if (req.file?.path) {
+        await fs.promises.unlink(req.file.path).catch(() => {});
+      }
+      return next(error);
+    }
+  }
+);
+
+// DELETE /api/program-library/lifts/:id/video — remove the demo video
+// without touching the lift itself.
+router.delete("/lifts/:id/video", async (req, res, next) => {
+  try {
+    const library = await readProgramLibrary();
+    const target = library.liftLibrary.find((l) => l.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ error: "Lift not found." });
+    }
+    const removed = await deleteVideo(target.id);
+    if (removed) {
+      await recordAudit({
+        req,
+        action: "program_library.video.delete",
+        targetType: "lift_library_entry",
+        targetId: target.id,
+        targetLabel: target.name
+      });
+    }
+    return res.json({ liftId: target.id, hasVideo: false });
   } catch (error) {
     return next(error);
   }

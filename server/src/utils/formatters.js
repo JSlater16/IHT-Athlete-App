@@ -16,6 +16,8 @@ function serializeLift(lift) {
     lastLoggedWeight: lift.lastLoggedWeight ?? null,
     notes: lift.notes,
     completed: lift.completed,
+    videoLiftId: lift.videoLiftId ?? null,
+    hasVideo: lift.hasVideo === true,
     createdAt: lift.createdAt,
     updatedAt: lift.updatedAt
   };
