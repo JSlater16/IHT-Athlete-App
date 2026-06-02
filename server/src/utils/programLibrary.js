@@ -6,10 +6,41 @@ const {
   allowedProgramVariants
 } = require("./programVariant");
 
-const LIBRARY_FILE = path.resolve(__dirname, "..", "..", "data", "programLibrary.json");
+// Git-tracked seed lives at server/data/programLibrary.json. The
+// runtime file lives under DATA_DIR (a Render persistent disk in
+// production, the same server/data/ dir in local dev). On first
+// access, if the runtime file is missing we copy the seed onto the
+// disk so brand-new deploys come up with a populated library.
+const SEED_LIBRARY_FILE = path.resolve(__dirname, "..", "..", "data", "programLibrary.json");
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(__dirname, "..", "..", "data");
+const LIBRARY_FILE = path.join(DATA_DIR, "programLibrary.json");
 const allowedFrequencies = new Set([3, 4, 5]);
 
+let seedChecked = false;
+async function ensureLibraryFileExists() {
+  // Cheap fast-path: only do the fs.access dance once per process. The
+  // file isn't going to vanish after we've confirmed it once, and
+  // readProgramLibrary is called on every program-library request.
+  if (seedChecked) return;
+  try {
+    await fs.access(LIBRARY_FILE);
+    seedChecked = true;
+    return;
+  } catch {
+    // Missing — fall through to copy.
+  }
+  if (LIBRARY_FILE !== SEED_LIBRARY_FILE) {
+    await fs.mkdir(path.dirname(LIBRARY_FILE), { recursive: true });
+    await fs.copyFile(SEED_LIBRARY_FILE, LIBRARY_FILE);
+    console.log(`[programLibrary] seeded ${LIBRARY_FILE} from ${SEED_LIBRARY_FILE}`);
+  }
+  seedChecked = true;
+}
+
 async function readProgramLibrary() {
+  await ensureLibraryFileExists();
   const file = await fs.readFile(LIBRARY_FILE, "utf8");
   const parsed = JSON.parse(file);
   // Older library files only had liftLibrary + programs. Default the
@@ -25,6 +56,7 @@ async function writeProgramLibrary(library) {
   // over the real one. If the process dies mid-write the original is
   // intact. fs.rename is atomic on POSIX when source/target share a
   // filesystem (they always do here — same dir).
+  await fs.mkdir(path.dirname(LIBRARY_FILE), { recursive: true });
   const tmp = `${LIBRARY_FILE}.tmp-${process.pid}-${Date.now()}`;
   await fs.writeFile(tmp, JSON.stringify(library, null, 2), "utf8");
   await fs.rename(tmp, LIBRARY_FILE);

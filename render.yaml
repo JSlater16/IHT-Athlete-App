@@ -14,6 +14,15 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run prisma:push && npm run bootstrap:owner -w server && npm run migrate:program-variant -w server && npm run backfill:lift-order -w server && npm run readiness:recompute -w server && npm run start
     healthCheckPath: /api/health
+    disk:
+      # Persistent volume for the program library JSON (so edits made
+      # in the workouts tab survive redeploys) and uploaded exercise
+      # videos. Mount path is OUTSIDE server/data/ so the git-tracked
+      # seed file at server/data/programLibrary.json stays readable and
+      # can be copied onto the disk on first boot.
+      name: app-data
+      mountPath: /var/lift-data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -21,6 +30,8 @@ services:
         value: 4000
       - key: HOST
         value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/lift-data
       - key: DATABASE_URL
         fromDatabase:
           name: lift-postgres
