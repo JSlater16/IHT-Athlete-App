@@ -100,12 +100,13 @@ async function main() {
         const day = dayMap.get(dayOffset);
         const lift = {
           liftId: r.lift_id,
+          exerciseName: r.exercise_name || "",
           sets: Number(r.sets) || 0,
           reps: Number(r.reps) || 0,
           weight: r.weight || ""
         };
         if (r.notes) lift.notes = r.notes;
-        if (r.block_label) lift.block = r.block_label;
+        if (r.block_label) lift.blockLabel = r.block_label;
         day.lifts.push(lift);
 
         if (!liftById.has(r.lift_id) && !incomingLifts.has(r.lift_id)) {
