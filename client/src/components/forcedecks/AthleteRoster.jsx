@@ -95,7 +95,7 @@ export default function AthleteRoster() {
             </p>
             {resyncResult ? <p className="fd-sync-result">{resyncResult}</p> : null}
           </div>
-          {user?.role === "OWNER" ? (
+          {user?.role === "OWNER" || user?.role === "COACH" ? (
             <div className="fd-page-actions">
               <button
                 type="button"
