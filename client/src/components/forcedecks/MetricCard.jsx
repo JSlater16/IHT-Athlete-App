@@ -10,32 +10,35 @@ function formatValue(value) {
   return value.toFixed(3);
 }
 
-function deltaVsCompare(value, compareValue, compareLabel) {
-  if (
-    !Number.isFinite(value) ||
-    !Number.isFinite(compareValue) ||
-    compareValue === 0
-  ) {
+function pctChange(value, baseline) {
+  if (!Number.isFinite(value) || !Number.isFinite(baseline) || baseline === 0) {
     return null;
   }
-  const pct = ((value - compareValue) / compareValue) * 100;
+  return ((value - baseline) / baseline) * 100;
+}
+
+function formatPct(pct) {
   const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
-  return `${sign}${Math.abs(pct).toFixed(1)}% from ${compareLabel}`;
+  return `${sign}${Math.abs(pct).toFixed(1)}%`;
+}
+
+function isAtPR(value, best) {
+  const pct = pctChange(value, best);
+  // Match-PR threshold of 0.05% absorbs float noise from re-imports.
+  return pct != null && Math.abs(pct) < 0.05;
 }
 
 function badgeFor(value, best, compareValue, compareLabel) {
-  if (value == null || best == null || !Number.isFinite(value) || !Number.isFinite(best) || best === 0) {
-    return null;
+  if (value == null || !Number.isFinite(value)) return null;
+  const atPR = isAtPR(value, best);
+  const compPct = pctChange(value, compareValue);
+
+  if (compPct == null) {
+    return atPR ? { tone: "pr", label: "PR" } : null;
   }
-  const pct = ((value - best) / best) * 100;
-  // Match-PR threshold of 0.05% absorbs float noise from re-imports.
-  if (Math.abs(pct) < 0.05) {
-    const delta = deltaVsCompare(value, compareValue, compareLabel);
-    return { tone: "pr", label: delta ? `PR · ${delta}` : "PR" };
-  }
-  const tone = pct < 0 ? "down" : "up";
-  const sign = pct > 0 ? "+" : "−";
-  return { tone, label: `${sign}${Math.abs(pct).toFixed(1)}% from PR` };
+  const tone = atPR ? "pr" : compPct < 0 ? "down" : "up";
+  const prefix = atPR ? "PR · " : "";
+  return { tone, label: `${prefix}${formatPct(compPct)} from ${compareLabel}` };
 }
 
 export default function MetricCard({ label, value, unit, sparklineData, best, compareValue, compareLabel = "last", onClick }) {

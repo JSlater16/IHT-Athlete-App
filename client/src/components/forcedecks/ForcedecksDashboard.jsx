@@ -90,7 +90,8 @@ function Body({ data, includeCoachMetrics, compareMode, onCompareModeChange, onS
   const metrics = (data.metricCatalog || []).filter((m) =>
     includeCoachMetrics ? true : !m.coachOnly
   );
-  const compareLabel = compareMode === "first" ? "first" : "last";
+  const compareLabel = compareMode === "previous" ? "last" : "first";
+  const isPRMode = compareMode === "pr";
 
   return (
     <>
@@ -125,11 +126,20 @@ function Body({ data, includeCoachMetrics, compareMode, onCompareModeChange, onS
           >
             vs First Session
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={compareMode === "pr"}
+            className={`lb-toggle-btn ${compareMode === "pr" ? "is-active" : ""}`}
+            onClick={() => onCompareModeChange("pr")}
+          >
+            PR
+          </button>
         </div>
       </div>
 
       <div className="fd-metric-grid">
-        {includeCoachMetrics && data.latestBodyMass?.value != null ? (
+        {!isPRMode && includeCoachMetrics && data.latestBodyMass?.value != null ? (
           <MetricCard
             label="Body Weight"
             value={Number(data.latestBodyMass.value) * 2.20462}
@@ -144,20 +154,24 @@ function Body({ data, includeCoachMetrics, compareMode, onCompareModeChange, onS
           />
         ) : null}
         {metrics.map((m) => {
+          const best = data.bests?.[m.key] ?? null;
+          const first = data.firsts?.[m.key] ?? null;
           const latestValue = latest?.metrics?.[m.key]?.value ?? null;
-          const compareValue =
-            compareMode === "first"
-              ? data.firsts?.[m.key] ?? null
+          const displayValue = isPRMode ? best : latestValue;
+          const compareValue = isPRMode
+            ? first
+            : compareMode === "first"
+              ? first
               : data.tests[1]?.metrics?.[m.key]?.value ?? null;
           const unit = latest?.metrics?.[m.key]?.unit ?? m.unit;
           return (
             <MetricCard
               key={m.key}
               label={m.label}
-              value={latestValue}
+              value={displayValue}
               unit={unit}
               sparklineData={sparklineForMetric(data.tests, m.key)}
-              best={data.bests?.[m.key] ?? null}
+              best={best}
               compareValue={compareValue}
               compareLabel={compareLabel}
               onClick={() => onSelectMetric({ key: m.key, label: m.label, unit })}
